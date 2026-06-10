@@ -1,0 +1,44 @@
+{
+  "name": "Empresa",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da empresa"
+    },
+    "cnpj": {
+      "type": "string",
+      "description": "CNPJ da empresa"
+    },
+    "inicio_atividades": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio das atividades"
+    },
+    "tipo_empresa": {
+      "type": "string",
+      "enum": [
+        "somente_servico",
+        "entradas_saidas",
+        "entradas_saidas_servicos"
+      ],
+      "default": "somente_servico",
+      "description": "Tipo de opera\u00e7\u00e3o da empresa"
+    },
+    "regime_tributario": {
+      "type": "string",
+      "enum": [
+        "simples_nacional",
+        "lucro_real",
+        "lucro_presumido"
+      ],
+      "default": "simples_nacional",
+      "description": "Regime tribut\u00e1rio"
+    }
+  },
+  "required": [
+    "nome",
+    "cnpj",
+    "tipo_empresa"
+  ]
+}
