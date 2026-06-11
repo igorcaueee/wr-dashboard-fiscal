@@ -47,6 +47,45 @@ function findRowByLabel(sheet, label, colIndex = 0) {
   return -1;
 }
 
+function findRowByLabelMultiCol(sheet, label) {
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  const normalizedTarget = normalizeStr(label);
+  for (let r = 0; r <= range.e.r; r++) {
+    for (let c = 0; c <= Math.min(range.e.c, 10); c++) {
+      const cellValue = extractCellValue(sheet, r, c);
+      if (cellValue && normalizeStr(String(cellValue)).includes(normalizedTarget)) {
+        return { row: r, col: c };
+      }
+    }
+  }
+  return null;
+}
+
+function findValueNearLabel(sheet, labelRow, range) {
+  // Check the label row first for numeric values, then next 2 rows
+  for (let r = labelRow; r <= Math.min(labelRow + 2, range.e.r); r++) {
+    // Scan right-to-left to find the rightmost numeric value (often the Total column)
+    let best = null;
+    for (let c = range.e.c; c >= 1; c--) {
+      const v = extractCellValue(sheet, r, c);
+      if (typeof v === 'number' && v > 0 && (best === null || c > best.c)) {
+        best = { c, v };
+      }
+    }
+    if (best) return best.v;
+  }
+  return null;
+}
+
+function findTotalColumn(sheet, headerRow, range) {
+  // Find the column index for "Total" header
+  for (let c = 0; c <= range.e.c; c++) {
+    const v = extractCellValue(sheet, headerRow, c);
+    if (v && normalizeStr(String(v)).trim() === 'total') return c;
+  }
+  return -1;
+}
+
 function extractPeriodoFromHeader(sheet) {
   const range = XLSX.utils.decode_range(sheet['!ref']);
   for (let r = 0; r <= Math.min(range.e.r, 15); r++) {
@@ -105,12 +144,22 @@ function parseSimplesNacional(workbook) {
   const result = {};
 
   // Extrair cabeçalho: nome, cnpj, periodo, inicio_atividades
+  // Busca flexível — o valor pode estar em qualquer coluna após o label
   if (input) {
     const { sheet: s, empresaCell } = input;
-    for (let rr = empresaCell.r; rr <= Math.min(empresaCell.r + 6, range.e.r); rr++) {
+    for (let rr = empresaCell.r; rr <= Math.min(empresaCell.r + 8, range.e.r); rr++) {
       const label = extractCellValue(s, rr, empresaCell.c);
-      const value = extractCellValue(s, rr, empresaCell.c + 1);
       if (!label) continue;
+      // Find the first non-null value in columns after the label
+      let value = null;
+      for (let cc = empresaCell.c + 1; cc <= Math.min(empresaCell.c + 20, range.e.c); cc++) {
+        const v = extractCellValue(s, rr, cc);
+        if (v !== null && v !== undefined && v !== '') {
+          value = v;
+          break;
+        }
+      }
+
       const nl = normalizeStr(String(label));
       if (nl.includes('cnpj')) {
         result._cnpj = value ? String(value).replace(/\D/g, '') : null;
@@ -137,63 +186,59 @@ function parseSimplesNacional(workbook) {
     result._periodo = extractPeriodoFromHeader(s);
   }
 
-  // Extrair receitas procurando por labels específicos
+  // Extrair receitas - usa busca flexível que funciona com labels divididos em múltiplas linhas
   const rpaRow = findRowByLabel(sheet, 'Receita Bruta do período de Apuração');
   if (rpaRow >= 0) {
-    const totalCol = findColumnByHeader(sheet, rpaRow, ['total']);
-    if (totalCol >= 0) {
-      const val = extractCellValue(sheet, rpaRow, totalCol);
-      if (val !== null && val !== undefined) result.receita_bruta_periodo = val;
-    }
+    result.receita_bruta_periodo = findValueNearLabel(sheet, rpaRow, range) || 0;
   }
 
   const rbtRow = findRowByLabel(sheet, 'Receita bruta acumulada nos doze meses anteriores');
   if (rbtRow >= 0) {
-    const totalCol = findColumnByHeader(sheet, rbtRow, ['total']);
-    if (totalCol >= 0) {
-      const val = extractCellValue(sheet, rbtRow, totalCol);
-      if (val !== null && val !== undefined) result.receita_bruta_acumulada_12m = val;
-    }
+    result.receita_bruta_acumulada_12m = findValueNearLabel(sheet, rbtRow, range) || 0;
   }
 
   const rbaCorrenteRow = findRowByLabel(sheet, 'Receita bruta acumulada no ano-calendário corrente');
   if (rbaCorrenteRow >= 0) {
-    const totalCol = findColumnByHeader(sheet, rbaCorrenteRow, ['total']);
-    if (totalCol >= 0) {
-      const val = extractCellValue(sheet, rbaCorrenteRow, totalCol);
-      if (val !== null && val !== undefined) result.receita_bruta_ano_corrente = val;
-    }
+    result.receita_bruta_ano_corrente = findValueNearLabel(sheet, rbaCorrenteRow, range) || 0;
   }
 
   const rbaAnteriorRow = findRowByLabel(sheet, 'Receita bruta acumulada no ano-calendário anterior');
   if (rbaAnteriorRow >= 0) {
-    const totalCol = findColumnByHeader(sheet, rbaAnteriorRow, ['total']);
-    if (totalCol >= 0) {
-      const val = extractCellValue(sheet, rbaAnteriorRow, totalCol);
-      if (val !== null && val !== undefined) result.receita_bruta_ano_anterior = val;
-    }
+    result.receita_bruta_ano_anterior = findValueNearLabel(sheet, rbaAnteriorRow, range) || 0;
   }
 
-  // Faixa de enquadramento
+  // Faixa de enquadramento — busca por padrão "XXX,XX a XXX,XX"
   const faixaRow = findRowByLabel(sheet, 'Faixa de Enquadramento');
   if (faixaRow >= 0) {
     for (let c = 1; c <= range.e.c; c++) {
       const val = extractCellValue(sheet, faixaRow, c);
-      if (val && String(val).match(/faixa/i)) {
+      if (val && String(val).match(/\d+\.?\d*,\d+\s*a\s*\d+\.?\d*,\d+/)) {
         result.faixa_enquadramento = String(val);
         break;
       }
     }
   }
 
-  // Fator R
+  // Fator R — pode estar como texto "Fator r: 1,00" ou como número separado
   const fatorRow = findRowByLabel(sheet, 'Fator r');
   if (fatorRow >= 0) {
-    for (let c = 1; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, fatorRow, c);
-      if (typeof val === 'number') {
-        result.fator_r = val;
-        break;
+    // Primeiro tenta extrair número do texto na coluna 0
+    const label0 = extractCellValue(sheet, fatorRow, 0);
+    if (label0) {
+      const match = String(label0).match(/([\d,.]+)/);
+      if (match) {
+        const num = parseFloat(match[1].replace(',', '.'));
+        if (!isNaN(num)) result.fator_r = num;
+      }
+    }
+    // Fallback: busca numérica nas colunas seguintes
+    if (result.fator_r === undefined) {
+      for (let c = 1; c <= range.e.c; c++) {
+        const val = extractCellValue(sheet, fatorRow, c);
+        if (typeof val === 'number') {
+          result.fator_r = val;
+          break;
+        }
       }
     }
   }
@@ -255,20 +300,34 @@ function excelSerialToDateSR(serial) {
 function scanSections(sheet, range) {
   const result = {};
 
-  // Scan for "Anexo" labels
-  for (let r = 0; r <= range.e.r; r++) {
-    const val = extractCellValue(sheet, r, 0);
-    if (!val) continue;
-    const nv = normalizeStr(String(val));
+  // Scan for section labels — check both col 0 and col 4 for format variations
+  let currentSection = null;
 
-    if (nv.includes('anexo i') && nv.includes('seção i') && !nv.includes('seção ii')) {
-      // Anexo I Seção I - sem ST
-      result.total_saidas_sem_st = extractReceitaTributada(sheet, r, range);
-    } else if (nv.includes('anexo i') && nv.includes('seção ii')) {
-      // Anexo I Seção II - com ST
-      result.total_saidas_st = extractReceitaTributada(sheet, r, range);
-    } else if (nv.includes('anexo iii')) {
-      result.total_servicos = extractReceitaTributada(sheet, r, range);
+  for (let r = 0; r <= range.e.r; r++) {
+    // Check col 0 and col 4 for section labels
+    for (const checkCol of [0, 4]) {
+      const val = extractCellValue(sheet, r, checkCol);
+      if (!val) continue;
+      const nv = normalizeStr(String(val));
+
+      if (nv.includes('anexo i') && nv.includes('seção i') && !nv.includes('seção ii')) {
+        currentSection = 'sem_st';
+      } else if (nv.includes('anexo i') && nv.includes('seção ii')) {
+        currentSection = 'com_st';
+      } else if (nv.includes('anexo iii')) {
+        currentSection = 'servicos';
+      }
+    }
+
+    // Check for "Receita Tributada Total" at col 0
+    const label0 = extractCellValue(sheet, r, 0);
+    if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
+      const valor = extractCellValue(sheet, r, 12); // Receita value (col 12 in both formats)
+      if (typeof valor === 'number') {
+        if (currentSection === 'sem_st') result.total_saidas_sem_st = valor;
+        else if (currentSection === 'com_st') result.total_saidas_st = valor;
+        else if (currentSection === 'servicos') result.total_servicos = valor;
+      }
     }
   }
 
@@ -435,21 +494,9 @@ function parseEntradas(workbook) {
   const range = XLSX.utils.decode_range(sheet['!ref']);
   const result = {};
 
-  // Find "Total Geral" row
-  let totalGeralRow = -1;
-  for (let r = 0; r <= range.e.r; r++) {
-    const val = extractCellValue(sheet, r, 0);
-    if (val && normalizeStr(String(val)) === 'total geral') {
-      totalGeralRow = r;
-      break;
-    }
-  }
-
-  if (totalGeralRow < 0) return result;
-
-  // Find column headers
+  // Find header row with column names
   let headerRow = -1;
-  for (let r = 3; r <= Math.min(8, range.e.r); r++) {
+  for (let r = 0; r <= Math.min(8, range.e.r); r++) {
     for (let c = 0; c <= range.e.c; c++) {
       const val = extractCellValue(sheet, r, c);
       if (val && normalizeStr(String(val)).includes('valor contabil')) {
@@ -465,30 +512,72 @@ function parseEntradas(workbook) {
   const colValorContabil = findColumnByHeader(sheet, headerRow, ['valor contabil', 'valor contábil']);
   const colBaseCalculo = findColumnByHeader(sheet, headerRow, ['base calculo', 'base cálculo']);
   const colValor = findColumnByHeader(sheet, headerRow, ['valor']);
+  const colTipo = findColumnByHeader(sheet, headerRow, ['tipo']);
 
-  // Total Geral - Valor Contábil
-  if (colValorContabil >= 0) {
-    const v = extractCellValue(sheet, totalGeralRow, colValorContabil);
-    if (typeof v === 'number') result.total_entradas = v;
+  // Check for "Total Geral" row (JUAREZ format)
+  let totalGeralRow = -1;
+  for (let r = 0; r <= range.e.r; r++) {
+    const val = extractCellValue(sheet, r, 0);
+    if (val && normalizeStr(String(val)) === 'total geral') {
+      totalGeralRow = r;
+      break;
+    }
   }
 
-  // For ICMS values, scan Total Geral row + nearby rows for ICMS type
-  for (let r = totalGeralRow; r <= Math.min(totalGeralRow + 3, range.e.r); r++) {
-    const label = extractCellValue(sheet, r, 0);
-    const tipoVal = extractCellValue(sheet, r, headerRow > 0 ? 1 : 1);
-    const isICMS = (label && normalizeStr(String(label)).includes('icms')) ||
-      (tipoVal && normalizeStr(String(tipoVal)).includes('icms'));
-
-    if (isICMS || r === totalGeralRow) {
-      if (colBaseCalculo >= 0 && result.base_calculo_icms_entradas === undefined) {
-        const v = extractCellValue(sheet, r, colBaseCalculo);
-        if (typeof v === 'number') result.base_calculo_icms_entradas = v;
-      }
-      if (colValor >= 0 && result.valor_icms_entradas === undefined) {
-        const v = extractCellValue(sheet, r, colValor);
-        if (typeof v === 'number') result.valor_icms_entradas = v;
+  if (totalGeralRow >= 0) {
+    // JUAREZ format — single Total Geral row
+    if (colValorContabil >= 0) {
+      const v = extractCellValue(sheet, totalGeralRow, colValorContabil);
+      if (typeof v === 'number') result.total_entradas = v;
+    }
+    for (let r = totalGeralRow; r <= Math.min(totalGeralRow + 3, range.e.r); r++) {
+      const label = extractCellValue(sheet, r, 0);
+      const tipoVal = extractCellValue(sheet, r, colTipo >= 0 ? colTipo : 1);
+      const isICMS = (label && normalizeStr(String(label)).includes('icms')) ||
+        (tipoVal && normalizeStr(String(tipoVal)).includes('icms'));
+      if (isICMS || r === totalGeralRow) {
+        if (colBaseCalculo >= 0 && result.base_calculo_icms_entradas === undefined) {
+          const v = extractCellValue(sheet, r, colBaseCalculo);
+          if (typeof v === 'number') result.base_calculo_icms_entradas = v;
+        }
+        if (colValor >= 0 && result.valor_icms_entradas === undefined) {
+          const v = extractCellValue(sheet, r, colValor);
+          if (typeof v === 'number') result.valor_icms_entradas = v;
+        }
       }
     }
+  } else {
+    // PALADAR format — summed by CFOP groups
+    let cfopTotal = 0;
+    const colInfoRow = findColumnByHeader(sheet, headerRow, ['cfop']);
+    for (let r = headerRow; r <= range.e.r; r++) {
+      const label = String(extractCellValue(sheet, r, colInfoRow >= 0 ? colInfoRow : 0) || '');
+      if (label.toUpperCase().startsWith('CFOP:')) {
+        if (r + 1 < range.e.r && colValorContabil >= 0) {
+          const v = extractCellValue(sheet, r + 1, colValorContabil);
+          if (typeof v === 'number') cfopTotal += v;
+        }
+      }
+    }
+    result.total_entradas = Math.round(cfopTotal * 100) / 100;
+
+    // Sum ICMS values across all rows
+    let icmsBase = 0, icmsValor = 0;
+    for (let r = headerRow; r <= range.e.r; r++) {
+      const tipoStr = String(extractCellValue(sheet, r, colTipo >= 0 ? colTipo : 7) || '').trim().toUpperCase();
+      if (tipoStr.includes('ICMS')) {
+        if (colBaseCalculo >= 0) {
+          const v = extractCellValue(sheet, r, colBaseCalculo);
+          if (typeof v === 'number') icmsBase += v;
+        }
+        if (colValor >= 0) {
+          const v = extractCellValue(sheet, r, colValor);
+          if (typeof v === 'number') icmsValor += v;
+        }
+      }
+    }
+    result.base_calculo_icms_entradas = Math.round(icmsBase * 100) / 100;
+    result.valor_icms_entradas = Math.round(icmsValor * 100) / 100;
   }
 
   return result;
