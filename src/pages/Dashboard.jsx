@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Line, ComposedChart, Legend, Cell, PieChart, Pie,
 } from 'recharts';
-import { Building2, TrendingUp, FileBarChart, Download, PieChartIcon, Calendar } from 'lucide-react';
+import { Building2, TrendingUp, FileBarChart, Download, PieChartIcon, Calendar, Castle } from 'lucide-react';
 import { formatBRL, formatPercent, formatMesAno, periodoToSort } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -156,58 +156,77 @@ export default function Dashboard() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-5 h-5 text-primary-foreground" />
+      {empresa && (
+        <div className="bg-primary rounded-2xl p-6 mb-6 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 opacity-10">
+            <Castle className="w-32 h-32 -mt-4 -mr-4" />
           </div>
-          <div>
-            <Select value={selectedEmpresaId} onValueChange={setSelectedEmpresaId}>
-              <SelectTrigger className="border-0 bg-transparent p-0 h-auto text-xl font-bold hover:no-underline focus:ring-0">
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                {empresas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {empresa && (
-              <p className="text-xs text-muted-foreground">
-                CNPJ: {empresa.cnpj} • Início: {empresa.inicio_atividades ? new Date(empresa.inicio_atividades + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Select value={selectedEmpresaId} onValueChange={setSelectedEmpresaId}>
+                  <SelectTrigger className="border-0 bg-white/10 p-0 h-auto text-xl font-bold hover:no-underline focus:ring-0 text-white [&>span]:text-white">
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empresas.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-white/80">
+                CNPJ: {empresa.cnpj}
               </p>
-            )}
+              <p className="text-sm text-white/80">
+                Início das Atividades: {empresa.inicio_atividades ? new Date(empresa.inicio_atividades + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select value={String(mesesVisiveis)} onValueChange={(v) => { setMesesVisiveis(Number(v)); setSelectedPeriodo(''); }}>
+                <SelectTrigger className="w-36 bg-white/10 border-white/20 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">3 meses</SelectItem>
+                  <SelectItem value="6">6 meses</SelectItem>
+                  <SelectItem value="12">12 meses</SelectItem>
+                  <SelectItem value="24">24 meses</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
+                <SelectTrigger className="w-44 bg-white/10 border-white/20 text-white">
+                  <Calendar className="w-4 h-4 mr-1" />
+                  <SelectValue placeholder="Mês específico" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={null}>Visão geral</SelectItem>
+                  {periodosDisponiveis.map((p) => (
+                    <SelectItem key={p} value={p}>{formatMesAno(p)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={handleExportPDF} className="gap-2 border-white/20 text-white hover:bg-white/10">
+                <Download className="w-4 h-4" /> Exportar PDF
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Select value={String(mesesVisiveis)} onValueChange={(v) => { setMesesVisiveis(Number(v)); setSelectedPeriodo(''); }}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
+      )}
+      {!empresa && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <Select value={selectedEmpresaId} onValueChange={setSelectedEmpresaId}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Selecione a empresa" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="3">3 meses</SelectItem>
-              <SelectItem value="6">6 meses</SelectItem>
-              <SelectItem value="12">12 meses</SelectItem>
-              <SelectItem value="24">24 meses</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
-            <SelectTrigger className="w-44">
-              <Calendar className="w-4 h-4 mr-1" />
-              <SelectValue placeholder="Mês específico" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={null}>Visão geral</SelectItem>
-              {periodosDisponiveis.map((p) => (
-                <SelectItem key={p} value={p}>{formatMesAno(p)}</SelectItem>
+              {empresas.map((e) => (
+                <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleExportPDF} className="gap-2">
-            <Download className="w-4 h-4" /> Exportar PDF
-          </Button>
         </div>
-      </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-6">
