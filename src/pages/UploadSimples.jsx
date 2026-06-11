@@ -507,6 +507,8 @@ export default function UploadSimples() {
   const [cnpjWarning, setCnpjWarning] = useState(null);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [pendingData, setPendingData] = useState(null);
+  const [periodoMes, setPeriodoMes] = useState('');
+  const [periodoAno, setPeriodoAno] = useState(String(new Date().getFullYear()));
 
   const { data: empresas = [] } = useQuery({
     queryKey: ['empresas'],
@@ -548,6 +550,10 @@ export default function UploadSimples() {
       setError('O relatório de Entradas por CFOP é obrigatório para este tipo de empresa.');
       return;
     }
+    if (!periodoMes) {
+      setError('Selecione o mês de referência.');
+      return;
+    }
 
     setProcessing(true);
 
@@ -574,7 +580,7 @@ export default function UploadSimples() {
       }
 
       // Build data payload
-      const periodo = parsedSimples.periodo || '00/0000';
+      const periodo = `${periodoMes}/${periodoAno}`;
       const payload = {
         empresa_id: empresaId,
         periodo,
@@ -693,6 +699,51 @@ export default function UploadSimples() {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Mês de Referência */}
+          <div className="space-y-2">
+            <Label>
+              Mês de Referência <span className="text-destructive">*</span>
+            </Label>
+            <div className="flex gap-3">
+              <Select value={periodoMes} onValueChange={setPeriodoMes}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { value: '01', label: 'Janeiro' },
+                    { value: '02', label: 'Fevereiro' },
+                    { value: '03', label: 'Março' },
+                    { value: '04', label: 'Abril' },
+                    { value: '05', label: 'Maio' },
+                    { value: '06', label: 'Junho' },
+                    { value: '07', label: 'Julho' },
+                    { value: '08', label: 'Agosto' },
+                    { value: '09', label: 'Setembro' },
+                    { value: '10', label: 'Outubro' },
+                    { value: '11', label: 'Novembro' },
+                    { value: '12', label: 'Dezembro' },
+                  ].map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={periodoAno} onValueChange={setPeriodoAno}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 10 }, (_, i) => {
+                    const ano = new Date().getFullYear() - 3 + i;
+                    return (
+                      <SelectItem key={ano} value={String(ano)}>{ano}</SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Arquivo Simples Nacional */}

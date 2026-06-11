@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Line, ComposedChart, Legend, Cell, PieChart, Pie,
 } from 'recharts';
-import { Building2, TrendingUp, FileBarChart, Download, PieChartIcon } from 'lucide-react';
+import { Building2, TrendingUp, FileBarChart, Download, PieChartIcon, Calendar } from 'lucide-react';
 import { formatBRL, formatPercent, formatMesAno, periodoToSort } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ const COLORS = {
 export default function Dashboard() {
   const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
   const [mesesVisiveis, setMesesVisiveis] = useState(6);
+  const [selectedPeriodo, setSelectedPeriodo] = useState('');
 
   const { data: empresas = [] } = useQuery({
     queryKey: ['empresas'],
@@ -59,6 +60,20 @@ export default function Dashboard() {
   }, [apuracoesOrdenadas, mesesVisiveis]);
 
   const ultimaApuracao = apuracoesOrdenadas[apuracoesOrdenadas.length - 1];
+
+  const apuracaoSelecionada = useMemo(() => {
+    if (!selectedPeriodo) return null;
+    return apuracoesOrdenadas.find((a) => a.periodo === selectedPeriodo) || null;
+  }, [apuracoesOrdenadas, selectedPeriodo]);
+
+  const periodosDisponiveis = useMemo(() => {
+    return apuracoesOrdenadas.map((a) => a.periodo).reverse();
+  }, [apuracoesOrdenadas]);
+
+  // Reset selectedPeriodo when empresa changes
+  useEffect(() => {
+    setSelectedPeriodo('');
+  }, [selectedEmpresaId]);
 
   // Chart data for Compras/Vendas/Serviços
   const barData = useMemo(() => {
@@ -165,7 +180,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={String(mesesVisiveis)} onValueChange={(v) => setMesesVisiveis(Number(v))}>
+          <Select value={String(mesesVisiveis)} onValueChange={(v) => { setMesesVisiveis(Number(v)); setSelectedPeriodo(''); }}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
@@ -174,6 +189,18 @@ export default function Dashboard() {
               <SelectItem value="6">6 meses</SelectItem>
               <SelectItem value="12">12 meses</SelectItem>
               <SelectItem value="24">24 meses</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
+            <SelectTrigger className="w-44">
+              <Calendar className="w-4 h-4 mr-1" />
+              <SelectValue placeholder="Mês específico" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={null}>Visão geral</SelectItem>
+              {periodosDisponiveis.map((p) => (
+                <SelectItem key={p} value={p}>{formatMesAno(p)}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button variant="outline" onClick={handleExportPDF} className="gap-2">
@@ -231,6 +258,101 @@ export default function Dashboard() {
               subtitle={`Período ${ultimaApuracao?.periodo || '-'}`}
             />
           </div>
+
+          {/* Relatório Mensal */}
+          {apuracaoSelecionada && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary" />
+                  Relatório Mensal — {formatMesAno(apuracaoSelecionada.periodo)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                  <MiniCard label="Receita Bruta" value={formatBRL(apuracaoSelecionada.receita_bruta_periodo)} />
+                  <MiniCard label="RBT12" value={formatBRL(apuracaoSelecionada.receita_bruta_acumulada_12m)} />
+                  <MiniCard label="Simples Nacional" value={formatBRL(apuracaoSelecionada.simples_nacional_total)} highlight />
+                  <MiniCard label="Alíquota Efetiva" value={formatPercent(apuracaoSelecionada.aliquota_efetiva)} />
+                  {apuracaoSelecionada.fator_r != null && (
+                    <MiniCard label="Fator R" value={(apuracaoSelecionada.fator_r * 100).toFixed(1).replace('.', ',') + '%'} />
+                  )}
+                  {apuracaoSelecionada.faixa_enquadramento && (
+                    <MiniCard label="Faixa" value={apuracaoSelecionada.faixa_enquadramento} />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {showEntradas && (
+                    <Card className="bg-white">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground mb-1">Total de Entradas</p>
+                        <p className="text-xl font-bold">{formatBRL(apuracaoSelecionada.total_entradas)}</p>
+                        {apuracaoSelecionada.valor_icms_entradas > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ICMS Entradas: {formatBRL(apuracaoSelecionada.valor_icms_entradas)}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                  {showSaidas && (
+                    <Card className="bg-white">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground mb-1">Total de Saídas</p>
+                        <p className="text-xl font-bold">
+                          {formatBRL((apuracaoSelecionada.total_saidas_sem_st || 0) + (apuracaoSelecionada.total_saidas_st || 0))}
+                        </p>
+                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                          {apuracaoSelecionada.total_saidas_sem_st > 0 && (
+                            <p>Sem ST: {formatBRL(apuracaoSelecionada.total_saidas_sem_st)}</p>
+                          )}
+                          {apuracaoSelecionada.total_saidas_st > 0 && (
+                            <p>Com ST: {formatBRL(apuracaoSelecionada.total_saidas_st)}</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {showServicos && (
+                    <Card className="bg-white">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground mb-1">Total de Serviços</p>
+                        <p className="text-xl font-bold">{formatBRL(apuracaoSelecionada.total_servicos)}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Partilha do mês */}
+                {(() => {
+                  const partilhaMes = [
+                    { name: 'IRPJ', value: apuracaoSelecionada.valor_irpj || 0 },
+                    { name: 'CSLL', value: apuracaoSelecionada.valor_csll || 0 },
+                    { name: 'COFINS', value: apuracaoSelecionada.valor_cofins || 0 },
+                    { name: 'PIS', value: apuracaoSelecionada.valor_pis || 0 },
+                    { name: 'CPP', value: apuracaoSelecionada.valor_cpp || 0 },
+                    { name: 'ICMS', value: apuracaoSelecionada.valor_icms || 0 },
+                    { name: 'ISS', value: apuracaoSelecionada.valor_iss || 0 },
+                  ].filter((d) => d.value > 0);
+
+                  return partilhaMes.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-medium mb-3">Partilha do Simples Nacional</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {partilhaMes.map((d) => (
+                          <div key={d.name} className="bg-white rounded-lg p-3 border">
+                            <p className="text-xs text-muted-foreground">{d.name}</p>
+                            <p className="text-base font-semibold">{formatBRL(d.value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Section 1: Compras, Vendas e Serviços */}
           <Card>
@@ -429,6 +551,18 @@ function SummaryCard({ title, value, icon: Icon, color, subtitle }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function MiniCard({ label, value, highlight }) {
+  return (
+    <div className={cn(
+      'rounded-lg p-3 border',
+      highlight ? 'bg-primary/10 border-primary/20' : 'bg-white'
+    )}>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={cn('text-base font-bold mt-0.5', highlight && 'text-primary')}>{value}</p>
+    </div>
   );
 }
 
