@@ -16,572 +16,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { parse as parseSomenteServico } from '@/lib/parsers/parserSomenteServico';
+import { parse as parseEntradasSaidas } from '@/lib/parsers/parserEntradasSaidas';
+import { parse as parseEntradasSaidasServicos } from '@/lib/parsers/parserEntradasSaidasServicos';
 
 const tipoLabels = {
   somente_servico: 'Somente Prestação de Serviços',
   entradas_saidas: 'Entradas e Saídas (Comércio)',
   entradas_saidas_servicos: 'Entradas, Saídas e Serviços (Comércio + Serviços)',
 };
-
-// ---- Helpers de parsing ----
-
-function normalizeStr(s) {
-  if (!s) return '';
-  return String(s).trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-}
-
-function extractCellValue(sheet, row, col) {
-  const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
-  return cell ? cell.v : null;
-}
-
-function findRowByLabel(sheet, label, colIndex = 0) {
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  const normalizedTarget = normalizeStr(label);
-  for (let r = 0; r <= range.e.r; r++) {
-    const cellValue = extractCellValue(sheet, r, colIndex);
-    if (cellValue && normalizeStr(String(cellValue)).includes(normalizedTarget)) {
-      return r;
-    }
-  }
-  return -1;
-}
-
-function findRowByLabelMultiCol(sheet, label) {
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  const normalizedTarget = normalizeStr(label);
-  for (let r = 0; r <= range.e.r; r++) {
-    for (let c = 0; c <= Math.min(range.e.c, 10); c++) {
-      const cellValue = extractCellValue(sheet, r, c);
-      if (cellValue && normalizeStr(String(cellValue)).includes(normalizedTarget)) {
-        return { row: r, col: c };
-      }
-    }
-  }
-  return null;
-}
-
-function findValueNearLabel(sheet, labelRow, range) {
-  // Check the label row first for numeric values, then next 2 rows
-  for (let r = labelRow; r <= Math.min(labelRow + 2, range.e.r); r++) {
-    // Scan right-to-left to find the rightmost numeric value (often the Total column)
-    let best = null;
-    for (let c = range.e.c; c >= 1; c--) {
-      const v = extractCellValue(sheet, r, c);
-      if (typeof v === 'number' && v > 0 && (best === null || c > best.c)) {
-        best = { c, v };
-      }
-    }
-    if (best) return best.v;
-  }
-  return null;
-}
-
-function findTotalColumn(sheet, headerRow, range) {
-  // Find the column index for "Total" header
-  for (let c = 0; c <= range.e.c; c++) {
-    const v = extractCellValue(sheet, headerRow, c);
-    if (v && normalizeStr(String(v)).trim() === 'total') return c;
-  }
-  return -1;
-}
-
-function extractPeriodoFromHeader(sheet) {
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  for (let r = 0; r <= Math.min(range.e.r, 15); r++) {
-    for (let c = 0; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, r, c);
-      if (val && (normalizeStr(String(val)).includes('periodo') || normalizeStr(String(val)).includes('período'))) {
-        // Value is typically in next column
-        const nextVal = extractCellValue(sheet, r, c + 1);
-        if (nextVal !== null && nextVal !== undefined) {
-          if (typeof nextVal === 'number') {
-            return nextVal;
-          }
-          if (typeof nextVal === 'string' && nextVal.match(/\d{4}-\d{2}-\d{2}/)) {
-            const d = new Date(nextVal + 'T00:00:00');
-            const excelEpoch = new Date(1899, 11, 30);
-            return Math.round((d - excelEpoch) / 86400000) - 1;
-          }
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function findColumnByHeader(sheet, headerRow, searchLabels) {
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  for (let c = 0; c <= range.e.c; c++) {
-    const val = extractCellValue(sheet, headerRow, c);
-    if (val) {
-      const n = normalizeStr(String(val));
-      for (const label of searchLabels) {
-        if (n.includes(normalizeStr(label))) return c;
-      }
-    }
-  }
-  return -1;
-}
-
-function parseSimplesNacional(workbook) {
-  const sheet = workbook.Sheets['Simples Nacional'] || workbook.Sheets[workbook.SheetNames[0]];
-  if (!sheet) throw new Error('Aba "Simples Nacional" não encontrada no arquivo.');
-
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  let input = null;
-  for (let r = 0; r <= range.e.r; r++) {
-    for (let c = 0; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, r, c);
-      if (val === 'Empresa:' || normalizeStr(String(val)).includes('empresa:')) {
-        input = { sheet, range, empresaCell: { r, c } };
-        break;
-      }
-    }
-    if (input) break;
-  }
-
-  const result = {};
-
-  // Extrair cabeçalho: nome, cnpj, periodo, inicio_atividades
-  // Busca flexível — o valor pode estar em qualquer coluna após o label
-  if (input) {
-    const { sheet: s, empresaCell } = input;
-    for (let rr = empresaCell.r; rr <= Math.min(empresaCell.r + 8, range.e.r); rr++) {
-      const label = extractCellValue(s, rr, empresaCell.c);
-      if (!label) continue;
-      // Find the first non-null value in columns after the label
-      let value = null;
-      for (let cc = empresaCell.c + 1; cc <= Math.min(empresaCell.c + 20, range.e.c); cc++) {
-        const v = extractCellValue(s, rr, cc);
-        if (v !== null && v !== undefined && v !== '') {
-          value = v;
-          break;
-        }
-      }
-
-      const nl = normalizeStr(String(label));
-      if (nl.includes('cnpj')) {
-        result._cnpj = value ? String(value).replace(/\D/g, '') : null;
-      }
-      if (nl.includes('periodo') || nl.includes('período')) {
-        if (typeof value === 'number') {
-          result._periodo = value;
-        } else if (typeof value === 'string') {
-          const match = value.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-          if (match) {
-            result._periodoRaw = `${match[2]}/${match[3]}`;
-          }
-        }
-      }
-      if (nl.includes('inicio das atividades') || nl.includes('início das atividades')) {
-        if (typeof value === 'number') {
-          result._inicioAtividades = value;
-        }
-      }
-    }
-  } else {
-    // Try scanning whole sheet
-    const s = sheet;
-    result._periodo = extractPeriodoFromHeader(s);
-  }
-
-  // Extrair receitas - usa busca flexível que funciona com labels divididos em múltiplas linhas
-  const rpaRow = findRowByLabel(sheet, 'Receita Bruta do período de Apuração');
-  if (rpaRow >= 0) {
-    result.receita_bruta_periodo = findValueNearLabel(sheet, rpaRow, range) || 0;
-  }
-
-  const rbtRow = findRowByLabel(sheet, 'Receita bruta acumulada nos doze meses anteriores');
-  if (rbtRow >= 0) {
-    result.receita_bruta_acumulada_12m = findValueNearLabel(sheet, rbtRow, range) || 0;
-  }
-
-  const rbaCorrenteRow = findRowByLabel(sheet, 'Receita bruta acumulada no ano-calendário corrente');
-  if (rbaCorrenteRow >= 0) {
-    result.receita_bruta_ano_corrente = findValueNearLabel(sheet, rbaCorrenteRow, range) || 0;
-  }
-
-  const rbaAnteriorRow = findRowByLabel(sheet, 'Receita bruta acumulada no ano-calendário anterior');
-  if (rbaAnteriorRow >= 0) {
-    result.receita_bruta_ano_anterior = findValueNearLabel(sheet, rbaAnteriorRow, range) || 0;
-  }
-
-  // Faixa de enquadramento — busca por padrão "XXX,XX a XXX,XX"
-  const faixaRow = findRowByLabel(sheet, 'Faixa de Enquadramento');
-  if (faixaRow >= 0) {
-    for (let c = 1; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, faixaRow, c);
-      if (val && String(val).match(/\d+\.?\d*,\d+\s*a\s*\d+\.?\d*,\d+/)) {
-        result.faixa_enquadramento = String(val);
-        break;
-      }
-    }
-  }
-
-  // Fator R — pode estar como texto "Fator r: 1,00" ou como número separado
-  const fatorRow = findRowByLabel(sheet, 'Fator r');
-  if (fatorRow >= 0) {
-    // Primeiro tenta extrair número do texto na coluna 0
-    const label0 = extractCellValue(sheet, fatorRow, 0);
-    if (label0) {
-      const match = String(label0).match(/([\d,.]+)/);
-      if (match) {
-        const num = parseFloat(match[1].replace(',', '.'));
-        if (!isNaN(num)) result.fator_r = num;
-      }
-    }
-    // Fallback: busca numérica nas colunas seguintes
-    if (result.fator_r === undefined) {
-      for (let c = 1; c <= range.e.c; c++) {
-        const val = extractCellValue(sheet, fatorRow, c);
-        if (typeof val === 'number') {
-          result.fator_r = val;
-          break;
-        }
-      }
-    }
-  }
-
-  // Seções - Anexo I Seção I (sem ST), Anexo I Seção II (com ST), Anexo III
-  const secoes = scanSections(sheet, range);
-  Object.assign(result, secoes);
-
-  // Total Simples Nacional
-  const simplesRow = findRowByLabel(sheet, 'Simples Nacional a recolher');
-  if (simplesRow >= 0) {
-    for (let c = range.e.c; c >= 1; c--) {
-      const val = extractCellValue(sheet, simplesRow, c);
-      if (typeof val === 'number' && val > 0) {
-        result.simples_nacional_total = val;
-        break;
-      }
-    }
-  }
-
-  // Alíquota efetiva
-  if (result.simples_nacional_total && result.receita_bruta_periodo && result.receita_bruta_periodo > 0) {
-    result.aliquota_efetiva = (result.simples_nacional_total / result.receita_bruta_periodo) * 100;
-  }
-
-  // Partilha
-  const partilha = extractPartilha(sheet, range);
-  Object.assign(result, partilha);
-
-  // Histórico 12m da aba "Anexo"
-  if (workbook.Sheets['Anexo']) {
-    result.historico_12m = extractHistorico12m(workbook.Sheets['Anexo']);
-  }
-
-  // Converter periodo serial para MM/YYYY
-  if (result._periodoRaw) {
-    result.periodo = result._periodoRaw;
-  } else if (result._periodo !== undefined && result._periodo !== null) {
-    const d = excelSerialToDateSR(result._periodo);
-    if (d) {
-      const mes = String(d.getMonth() + 1).padStart(2, '0');
-      const ano = d.getFullYear();
-      result.periodo = `${mes}/${ano}`;
-    }
-  }
-
-  return result;
-}
-
-function excelSerialToDateSR(serial) {
-  if (!serial && serial !== 0) return null;
-  const excelEpoch = new Date(1899, 11, 30);
-  const msPerDay = 86400000;
-  let days = parseInt(serial);
-  if (days > 60) days -= 2;
-  return new Date(excelEpoch.getTime() + days * msPerDay);
-}
-
-function scanSections(sheet, range) {
-  const result = {};
-
-  // Scan for section labels — check both col 0 and col 4 for format variations
-  let currentSection = null;
-
-  for (let r = 0; r <= range.e.r; r++) {
-    // Check col 0 and col 4 for section labels
-    for (const checkCol of [0, 4]) {
-      const val = extractCellValue(sheet, r, checkCol);
-      if (!val) continue;
-      const nv = normalizeStr(String(val));
-
-      if (nv.includes('anexo i') && nv.includes('seção i') && !nv.includes('seção ii')) {
-        currentSection = 'sem_st';
-      } else if (nv.includes('anexo i') && nv.includes('seção ii')) {
-        currentSection = 'com_st';
-      } else if (nv.includes('anexo iii')) {
-        currentSection = 'servicos';
-      }
-    }
-
-    // Check for "Receita Tributada Total" at col 0
-    const label0 = extractCellValue(sheet, r, 0);
-    if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
-      const valor = extractCellValue(sheet, r, 12); // Receita value (col 12 in both formats)
-      if (typeof valor === 'number') {
-        if (currentSection === 'sem_st') result.total_saidas_sem_st = valor;
-        else if (currentSection === 'com_st') result.total_saidas_st = valor;
-        else if (currentSection === 'servicos') result.total_servicos = valor;
-      }
-    }
-  }
-
-  return result;
-}
-
-function extractReceitaTributada(sheet, startRow, range) {
-  for (let r = startRow; r <= Math.min(startRow + 30, range.e.r); r++) {
-    const val = extractCellValue(sheet, r, 0);
-    if (val && normalizeStr(String(val)).includes('receita tributada total')) {
-      for (let c = range.e.c; c >= 1; c--) {
-        const v = extractCellValue(sheet, r, c);
-        if (typeof v === 'number') return v;
-      }
-    }
-  }
-  return null;
-}
-
-function extractPartilha(sheet, range) {
-  const result = {
-    valor_irpj: 0, valor_csll: 0, valor_cofins: 0,
-    valor_pis: 0, valor_cpp: 0, valor_icms: 0, valor_iss: 0,
-  };
-
-  // Find "Partilha do Simples Nacional" or similar
-  let partilhaStart = -1;
-  for (let r = 0; r <= range.e.r; r++) {
-    const val = extractCellValue(sheet, r, 0);
-    if (val && normalizeStr(String(val)).includes('partilha')) {
-      partilhaStart = r;
-      break;
-    }
-  }
-
-  if (partilhaStart < 0) return result;
-
-  const colMap = {};
-  for (let r = partilhaStart; r <= Math.min(partilhaStart + 5, range.e.r); r++) {
-    for (let c = 0; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, r, c);
-      if (val) {
-        const nv = normalizeStr(String(val));
-        if (!colMap.irpj && (nv.includes('irpj') || nv === 'irpj')) colMap.irpj = c;
-        if (!colMap.csll && (nv.includes('csll') || nv === 'csll')) colMap.csll = c;
-        if (!colMap.cofins && (nv === 'cofins')) colMap.cofins = c;
-        if (!colMap.pis && (nv === 'pis' || nv === 'pis/pasep')) colMap.pis = c;
-        if (!colMap.cpp && (nv.includes('cpp') || nv.includes('inss') || nv.includes('previdenci'))) colMap.cpp = c;
-        if (!colMap.icms && (nv === 'icms')) colMap.icms = c;
-        if (!colMap.iss && (nv === 'iss' || nv === 'issqn')) colMap.iss = c;
-      }
-    }
-  }
-
-  // Sum "Valor:" rows after partilha start
-  for (let r = partilhaStart + 2; r <= Math.min(range.e.r, partilhaStart + 50); r++) {
-    const rowLabel = extractCellValue(sheet, r, 0);
-    if (rowLabel && normalizeStr(String(rowLabel)).includes('total')) break;
-
-    // Check if any cell in this row contains "Valor:"
-    let isValueRow = false;
-    for (let c = 0; c <= range.e.c; c++) {
-      const v = extractCellValue(sheet, r, c);
-      if (v && normalizeStr(String(v)) === 'valor:') {
-        isValueRow = true;
-        break;
-      }
-    }
-    if (!isValueRow) continue;
-
-    if (colMap.irpj >= 0) {
-      const v = extractCellValue(sheet, r, colMap.irpj);
-      if (typeof v === 'number') result.valor_irpj += v;
-    }
-    if (colMap.csll >= 0) {
-      const v = extractCellValue(sheet, r, colMap.csll);
-      if (typeof v === 'number') result.valor_csll += v;
-    }
-    if (colMap.cofins >= 0) {
-      const v = extractCellValue(sheet, r, colMap.cofins);
-      if (typeof v === 'number') result.valor_cofins += v;
-    }
-    if (colMap.pis >= 0) {
-      const v = extractCellValue(sheet, r, colMap.pis);
-      if (typeof v === 'number') result.valor_pis += v;
-    }
-    if (colMap.cpp >= 0) {
-      const v = extractCellValue(sheet, r, colMap.cpp);
-      if (typeof v === 'number') result.valor_cpp += v;
-    }
-    if (colMap.icms >= 0) {
-      const v = extractCellValue(sheet, r, colMap.icms);
-      if (typeof v === 'number') result.valor_icms += v;
-    }
-    if (colMap.iss >= 0) {
-      const v = extractCellValue(sheet, r, colMap.iss);
-      if (typeof v === 'number') result.valor_iss += v;
-    }
-  }
-
-  return result;
-}
-
-function extractHistorico12m(sheet) {
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  const historico = [];
-
-  // Find table header with "Período" and "Receita Bruta"
-  let headerRow = -1;
-  let periodoCol = -1;
-  let receitaCol = -1;
-
-  for (let r = 0; r <= range.e.r; r++) {
-    for (let c = 0; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, r, c);
-      if (val && normalizeStr(String(val)).includes('periodo')) {
-        headerRow = r;
-        periodoCol = c;
-      }
-      if (val && normalizeStr(String(val)).includes('receita bruta') && !normalizeStr(String(val)).includes('exceto')) {
-        if (headerRow === r) receitaCol = c;
-      }
-    }
-    if (headerRow >= 0 && periodoCol >= 0 && receitaCol >= 0) break;
-  }
-
-  if (headerRow < 0 || receitaCol < 0) return historico;
-
-  // Read rows
-  for (let r = headerRow + 1; r <= range.e.r; r++) {
-    const periodoVal = extractCellValue(sheet, r, periodoCol);
-    const receitaVal = extractCellValue(sheet, r, receitaCol);
-
-    if (!periodoVal || !receitaVal) continue;
-    if (typeof receitaVal !== 'number') continue;
-
-    let periodoStr = null;
-    if (typeof periodoVal === 'number') {
-      const d = excelSerialToDateSR(periodoVal);
-      if (d) {
-        const mes = String(d.getMonth() + 1).padStart(2, '0');
-        const ano = d.getFullYear();
-        periodoStr = `${mes}/${ano}`;
-      }
-    } else if (typeof periodoVal === 'string') {
-      const match = periodoVal.match(/(\d{2})\/(\d{4})/);
-      if (match) periodoStr = `${match[1]}/${match[2]}`;
-    }
-
-    if (periodoStr && !isNaN(receitaVal)) {
-      historico.push({ periodo: periodoStr, receita_bruta: receitaVal });
-    }
-  }
-
-  return historico;
-}
-
-// ---- Parsing Entradas ----
-
-function parseEntradas(workbook) {
-  const sheet = workbook.Sheets['Entradas'] || workbook.Sheets[workbook.SheetNames[0]];
-  if (!sheet) throw new Error('Aba "Entradas" não encontrada no arquivo.');
-
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-  const result = {};
-
-  // Find header row with column names
-  let headerRow = -1;
-  for (let r = 0; r <= Math.min(8, range.e.r); r++) {
-    for (let c = 0; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, r, c);
-      if (val && normalizeStr(String(val)).includes('valor contabil')) {
-        headerRow = r;
-        break;
-      }
-    }
-    if (headerRow >= 0) break;
-  }
-
-  if (headerRow < 0) return result;
-
-  const colValorContabil = findColumnByHeader(sheet, headerRow, ['valor contabil', 'valor contábil']);
-  const colBaseCalculo = findColumnByHeader(sheet, headerRow, ['base calculo', 'base cálculo']);
-  const colValor = findColumnByHeader(sheet, headerRow, ['valor']);
-  const colTipo = findColumnByHeader(sheet, headerRow, ['tipo']);
-
-  // Check for "Total Geral" row (JUAREZ format)
-  let totalGeralRow = -1;
-  for (let r = 0; r <= range.e.r; r++) {
-    const val = extractCellValue(sheet, r, 0);
-    if (val && normalizeStr(String(val)) === 'total geral') {
-      totalGeralRow = r;
-      break;
-    }
-  }
-
-  if (totalGeralRow >= 0) {
-    // JUAREZ format — single Total Geral row
-    if (colValorContabil >= 0) {
-      const v = extractCellValue(sheet, totalGeralRow, colValorContabil);
-      if (typeof v === 'number') result.total_entradas = v;
-    }
-    for (let r = totalGeralRow; r <= Math.min(totalGeralRow + 3, range.e.r); r++) {
-      const label = extractCellValue(sheet, r, 0);
-      const tipoVal = extractCellValue(sheet, r, colTipo >= 0 ? colTipo : 1);
-      const isICMS = (label && normalizeStr(String(label)).includes('icms')) ||
-        (tipoVal && normalizeStr(String(tipoVal)).includes('icms'));
-      if (isICMS || r === totalGeralRow) {
-        if (colBaseCalculo >= 0 && result.base_calculo_icms_entradas === undefined) {
-          const v = extractCellValue(sheet, r, colBaseCalculo);
-          if (typeof v === 'number') result.base_calculo_icms_entradas = v;
-        }
-        if (colValor >= 0 && result.valor_icms_entradas === undefined) {
-          const v = extractCellValue(sheet, r, colValor);
-          if (typeof v === 'number') result.valor_icms_entradas = v;
-        }
-      }
-    }
-  } else {
-    // PALADAR format — summed by CFOP groups
-    let cfopTotal = 0;
-    const colInfoRow = findColumnByHeader(sheet, headerRow, ['cfop']);
-    for (let r = headerRow; r <= range.e.r; r++) {
-      const label = String(extractCellValue(sheet, r, colInfoRow >= 0 ? colInfoRow : 0) || '');
-      if (label.toUpperCase().startsWith('CFOP:')) {
-        if (r + 1 < range.e.r && colValorContabil >= 0) {
-          const v = extractCellValue(sheet, r + 1, colValorContabil);
-          if (typeof v === 'number') cfopTotal += v;
-        }
-      }
-    }
-    result.total_entradas = Math.round(cfopTotal * 100) / 100;
-
-    // Sum ICMS values across all rows
-    let icmsBase = 0, icmsValor = 0;
-    for (let r = headerRow; r <= range.e.r; r++) {
-      const tipoStr = String(extractCellValue(sheet, r, colTipo >= 0 ? colTipo : 7) || '').trim().toUpperCase();
-      if (tipoStr.includes('ICMS')) {
-        if (colBaseCalculo >= 0) {
-          const v = extractCellValue(sheet, r, colBaseCalculo);
-          if (typeof v === 'number') icmsBase += v;
-        }
-        if (colValor >= 0) {
-          const v = extractCellValue(sheet, r, colValor);
-          if (typeof v === 'number') icmsValor += v;
-        }
-      }
-    }
-    result.base_calculo_icms_entradas = Math.round(icmsBase * 100) / 100;
-    result.valor_icms_entradas = Math.round(icmsValor * 100) / 100;
-  }
-
-  return result;
-}
 
 // ---- Component ----
 
@@ -647,24 +90,31 @@ export default function UploadSimples() {
     setProcessing(true);
 
     try {
-      // Parse Simples Nacional
+      // Carregar workbooks
       const simplesData = await readXLSX(simplesFile);
       const simplesWorkbook = XLSX.read(simplesData, { type: 'array' });
-      const parsedSimples = parseSimplesNacional(simplesWorkbook);
 
-      // Parse Entradas (if needed)
-      let parsedEntradas = {};
-      if (empresa.tipo_empresa !== 'somente_servico' && entradasFile) {
+      let entradasWorkbook = null;
+      if (entradasFile) {
         const entradasData = await readXLSX(entradasFile);
-        const entradasWorkbook = XLSX.read(entradasData, { type: 'array' });
-        parsedEntradas = parseEntradas(entradasWorkbook);
+        entradasWorkbook = XLSX.read(entradasData, { type: 'array' });
+      }
+
+      // Selecionar parser conforme o tipo da empresa
+      let parsed;
+      if (empresa.tipo_empresa === 'somente_servico') {
+        parsed = parseSomenteServico(simplesWorkbook);
+      } else if (empresa.tipo_empresa === 'entradas_saidas') {
+        parsed = parseEntradasSaidas(simplesWorkbook, entradasWorkbook);
+      } else {
+        parsed = parseEntradasSaidasServicos(simplesWorkbook, entradasWorkbook);
       }
 
       // Check CNPJ
       const cnpjEmpresa = empresa.cnpj ? empresa.cnpj.replace(/\D/g, '') : '';
-      if (parsedSimples._cnpj && cnpjEmpresa && parsedSimples._cnpj !== cnpjEmpresa) {
+      if (parsed._cnpj && cnpjEmpresa && parsed._cnpj !== cnpjEmpresa) {
         setCnpjWarning(
-          `O CNPJ do relatório (${parsedSimples._cnpj}) não confere com o CNPJ da empresa (${cnpjEmpresa}).`
+          `O CNPJ do relatório (${parsed._cnpj}) não confere com o CNPJ da empresa (${cnpjEmpresa}).`
         );
       }
 
@@ -674,28 +124,28 @@ export default function UploadSimples() {
         empresa_id: empresaId,
         periodo,
         tipo_arquivo: 'dominio_simples',
-        receita_bruta_periodo: parsedSimples.receita_bruta_periodo || 0,
-        receita_bruta_acumulada_12m: parsedSimples.receita_bruta_acumulada_12m || 0,
-        receita_bruta_ano_corrente: parsedSimples.receita_bruta_ano_corrente || 0,
-        receita_bruta_ano_anterior: parsedSimples.receita_bruta_ano_anterior || 0,
-        faixa_enquadramento: parsedSimples.faixa_enquadramento || null,
-        fator_r: parsedSimples.fator_r || null,
-        total_saidas_sem_st: parsedSimples.total_saidas_sem_st || 0,
-        total_saidas_st: parsedSimples.total_saidas_st || 0,
-        total_servicos: parsedSimples.total_servicos || 0,
-        simples_nacional_total: parsedSimples.simples_nacional_total || 0,
-        aliquota_efetiva: parsedSimples.aliquota_efetiva || 0,
-        valor_irpj: parsedSimples.valor_irpj || 0,
-        valor_csll: parsedSimples.valor_csll || 0,
-        valor_cofins: parsedSimples.valor_cofins || 0,
-        valor_pis: parsedSimples.valor_pis || 0,
-        valor_cpp: parsedSimples.valor_cpp || 0,
-        valor_icms: parsedSimples.valor_icms || 0,
-        valor_iss: parsedSimples.valor_iss || 0,
-        total_entradas: parsedEntradas.total_entradas || 0,
-        base_calculo_icms_entradas: parsedEntradas.base_calculo_icms_entradas || 0,
-        valor_icms_entradas: parsedEntradas.valor_icms_entradas || 0,
-        historico_12m: parsedSimples.historico_12m || [],
+        receita_bruta_periodo: parsed.receita_bruta_periodo || 0,
+        receita_bruta_acumulada_12m: parsed.receita_bruta_acumulada_12m || 0,
+        receita_bruta_ano_corrente: parsed.receita_bruta_ano_corrente || 0,
+        receita_bruta_ano_anterior: parsed.receita_bruta_ano_anterior || 0,
+        faixa_enquadramento: parsed.faixa_enquadramento || null,
+        fator_r: parsed.fator_r || null,
+        total_saidas_sem_st: parsed.total_saidas_sem_st || 0,
+        total_saidas_st: parsed.total_saidas_st || 0,
+        total_servicos: parsed.total_servicos || 0,
+        simples_nacional_total: parsed.simples_nacional_total || 0,
+        aliquota_efetiva: parsed.aliquota_efetiva || 0,
+        valor_irpj: parsed.valor_irpj || 0,
+        valor_csll: parsed.valor_csll || 0,
+        valor_cofins: parsed.valor_cofins || 0,
+        valor_pis: parsed.valor_pis || 0,
+        valor_cpp: parsed.valor_cpp || 0,
+        valor_icms: parsed.valor_icms || 0,
+        valor_iss: parsed.valor_iss || 0,
+        total_entradas: parsed.total_entradas || 0,
+        base_calculo_icms_entradas: parsed.base_calculo_icms_entradas || 0,
+        valor_icms_entradas: parsed.valor_icms_entradas || 0,
+        historico_12m: parsed.historico_12m || [],
       };
 
       // Check for duplicate
