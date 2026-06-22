@@ -127,12 +127,36 @@ export default function Dashboard() {
     const { default: jsPDF } = await import('jspdf');
     const element = document.getElementById('dashboard-content');
     if (!element) return;
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+
+    // Temporariamente força largura fixa A4 para captura uniforme
+    const originalWidth = element.style.width;
+    element.style.width = '794px'; // ~210mm em 96dpi
+    const canvas = await html2canvas(element, { scale: 2, useCORS: true, windowWidth: 794 });
+    element.style.width = originalWidth;
+
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const width = pdf.internal.pageSize.getWidth();
-    const height = (canvas.height * width) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 10, width, height);
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const marginX = 8; // mm
+    const marginY = 8;
+    const imgWidth = pageWidth - marginX * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    // Se a imagem for mais alta que uma página, divide em múltiplas
+    const pageHeight = pdf.internal.pageSize.getHeight() - marginY * 2;
+    let heightLeft = imgHeight;
+    let position = marginY;
+
+    pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position = marginY - (imgHeight - heightLeft);
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
     pdf.save(`dashboard-${empresa?.nome || 'fiscal'}.pdf`);
   };
 
