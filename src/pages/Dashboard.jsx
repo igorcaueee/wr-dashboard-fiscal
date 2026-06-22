@@ -207,7 +207,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-3">
               <Select value={String(mesesVisiveis)} onValueChange={(v) => { setMesesVisiveis(Number(v)); setSelectedPeriodo(''); }}>
-                <SelectTrigger className="w-36 bg-white/10 border-white/20 text-white">
+                <SelectTrigger className="w-36 bg-white/10 border-white/20 text-white data-[placeholder]:text-white/60">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -218,7 +218,7 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
               <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
-                <SelectTrigger className="w-44 bg-white/10 border-white/20 text-white">
+                <SelectTrigger className="w-44 bg-white/10 border-white/20 text-white data-[placeholder]:text-white/60">
                   <Calendar className="w-4 h-4 mr-1" />
                   <SelectValue placeholder="Mês específico" />
                 </SelectTrigger>
