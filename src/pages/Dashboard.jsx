@@ -94,19 +94,19 @@ export default function Dashboard() {
     }));
   }, [ultimosMeses]);
 
-  // Partilha data
+  // Partilha data — agregado do período visível
   const partilhaData = useMemo(() => {
-    if (!ultimaApuracao) return [];
+    if (!agregados?.partilha) return [];
     return [
-      { name: 'IRPJ', value: ultimaApuracao.valor_irpj || 0 },
-      { name: 'CSLL', value: ultimaApuracao.valor_csll || 0 },
-      { name: 'COFINS', value: ultimaApuracao.valor_cofins || 0 },
-      { name: 'PIS', value: ultimaApuracao.valor_pis || 0 },
-      { name: 'CPP', value: ultimaApuracao.valor_cpp || 0 },
-      { name: 'ICMS', value: ultimaApuracao.valor_icms || 0 },
-      { name: 'ISS', value: ultimaApuracao.valor_iss || 0 },
+      { name: 'IRPJ', value: agregados.partilha.valor_irpj },
+      { name: 'CSLL', value: agregados.partilha.valor_csll },
+      { name: 'COFINS', value: agregados.partilha.valor_cofins },
+      { name: 'PIS', value: agregados.partilha.valor_pis },
+      { name: 'CPP', value: agregados.partilha.valor_cpp },
+      { name: 'ICMS', value: agregados.partilha.valor_icms },
+      { name: 'ISS', value: agregados.partilha.valor_iss },
     ].filter((d) => d.value > 0);
-  }, [ultimaApuracao]);
+  }, [agregados]);
 
   const PARTILHA_COLORS = ['#0d9488', '#14b8a6', '#f97316', '#fb923c', '#7c3aed', '#a78bfa', '#e11d48'];
 
@@ -115,11 +115,25 @@ export default function Dashboard() {
   const showServicos = tipoEmpresa !== 'entradas_saidas';
   const showSaidas = tipoEmpresa !== 'somente_servico';
 
-  // Calculate totals for summary cards
-  const totalUltimoMes = ultimaApuracao
-    ? (ultimaApuracao.total_servicos || 0) +
-      ((ultimaApuracao.total_saidas_sem_st || 0) + (ultimaApuracao.total_saidas_st || 0))
-    : 0;
+  // Agregados do período visível para os cards de resumo
+  const agregados = useMemo(() => {
+    if (ultimosMeses.length === 0) return null;
+    const simplesTotal = ultimosMeses.reduce((s, a) => s + (a.simples_nacional_total || 0), 0);
+    const receitaTotal = ultimosMeses.reduce((s, a) => s + (a.receita_bruta_periodo || 0), 0);
+    const faturamentoTotal = ultimosMeses.reduce((s, a) =>
+      s + (a.total_servicos || 0) + (a.total_saidas_sem_st || 0) + (a.total_saidas_st || 0), 0);
+    const aliquotaEfetiva = receitaTotal > 0 ? (simplesTotal / receitaTotal) * 100 : 0;
+    const partilha = {
+      valor_irpj: ultimosMeses.reduce((s, a) => s + (a.valor_irpj || 0), 0),
+      valor_csll: ultimosMeses.reduce((s, a) => s + (a.valor_csll || 0), 0),
+      valor_cofins: ultimosMeses.reduce((s, a) => s + (a.valor_cofins || 0), 0),
+      valor_pis: ultimosMeses.reduce((s, a) => s + (a.valor_pis || 0), 0),
+      valor_cpp: ultimosMeses.reduce((s, a) => s + (a.valor_cpp || 0), 0),
+      valor_icms: ultimosMeses.reduce((s, a) => s + (a.valor_icms || 0), 0),
+      valor_iss: ultimosMeses.reduce((s, a) => s + (a.valor_iss || 0), 0),
+    };
+    return { simplesTotal, receitaTotal, faturamentoTotal, aliquotaEfetiva, partilha };
+  }, [ultimosMeses]);
 
   const handleExportPDF = async () => {
     const { default: html2canvas } = await import('html2canvas');
@@ -282,22 +296,24 @@ export default function Dashboard() {
             />
             <SummaryCard
               title="Simples a Recolher"
-              value={formatBRL(ultimaApuracao?.simples_nacional_total)}
+              value={formatBRL(agregados?.simplesTotal)}
               icon={FileBarChart}
               color="orange"
             />
             <SummaryCard
               title="Alíquota Efetiva"
-              value={formatPercent(ultimaApuracao?.aliquota_efetiva)}
+              value={formatPercent(agregados?.aliquotaEfetiva)}
               icon={PieChartIcon}
               color="purple"
             />
             <SummaryCard
               title="Faturamento Total"
-              value={formatBRL(totalUltimoMes)}
+              value={formatBRL(agregados?.faturamentoTotal)}
               icon={TrendingUp}
               color="green"
-              subtitle={`Período ${ultimaApuracao?.periodo || '-'}`}
+              subtitle={ultimosMeses.length > 0
+                ? `De ${formatMesAno(ultimosMeses[0].periodo)} a ${formatMesAno(ultimosMeses[ultimosMeses.length - 1].periodo)}`
+                : ''}
             />
           </div>
 
