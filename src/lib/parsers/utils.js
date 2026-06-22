@@ -145,9 +145,10 @@ export function extractFaixaFator(sheet) {
 
   const faixaRow = findRowByLabel(sheet, 'Faixa de Enquadramento');
   if (faixaRow >= 0) {
+    // Procura valor no formato brasileiro com separadores de milhar: ex "720.000,01 a 1.800.000,00"
     for (let c = 1; c <= range.e.c; c++) {
       const val = extractCellValue(sheet, faixaRow, c);
-      if (val && String(val).match(/\d+\.?\d*,\d+\s*a\s*\d+\.?\d*,\d+/)) {
+      if (val && String(val).match(/[\d.]+,\d+\s+a\s+[\d.]+,\d+/)) {
         result.faixa_enquadramento = String(val);
         break;
       }
@@ -194,6 +195,7 @@ export function extractPartilha(sheet) {
     valor_pis: 0, valor_cpp: 0, valor_icms: 0, valor_iss: 0,
   };
 
+  // Encontra a primeira linha de partilha
   let partilhaStart = -1;
   for (let r = 0; r <= range.e.r; r++) {
     const val = extractCellValue(sheet, r, 0);
@@ -204,27 +206,31 @@ export function extractPartilha(sheet) {
   }
   if (partilhaStart < 0) return result;
 
+  // Mapeia colunas de impostos — varre linhas da partilha até achar todos
   const colMap = {};
   for (let r = partilhaStart; r <= Math.min(partilhaStart + 5, range.e.r); r++) {
     for (let c = 0; c <= range.e.c; c++) {
       const val = extractCellValue(sheet, r, c);
-      if (val) {
-        const nv = normalizeStr(String(val));
-        if (!colMap.irpj && (nv.includes('irpj') || nv === 'irpj')) colMap.irpj = c;
-        if (!colMap.csll && (nv.includes('csll') || nv === 'csll')) colMap.csll = c;
-        if (!colMap.cofins && nv === 'cofins') colMap.cofins = c;
-        if (!colMap.pis && (nv === 'pis' || nv === 'pis/pasep')) colMap.pis = c;
-        if (!colMap.cpp && (nv.includes('cpp') || nv.includes('inss') || nv.includes('previdenci'))) colMap.cpp = c;
-        if (!colMap.icms && nv === 'icms') colMap.icms = c;
-        if (!colMap.iss && (nv === 'iss' || nv === 'issqn')) colMap.iss = c;
-      }
+      if (!val) continue;
+      const nv = normalizeStr(String(val));
+      if (colMap.irpj === undefined && (nv.includes('irpj') || nv === 'irpj')) colMap.irpj = c;
+      if (colMap.csll === undefined && (nv.includes('csll') || nv === 'csll')) colMap.csll = c;
+      if (colMap.cofins === undefined && nv.includes('cofins')) colMap.cofins = c;
+      if (colMap.pis === undefined && (nv.includes('pis') || nv === 'pis/pasep')) colMap.pis = c;
+      if (colMap.cpp === undefined && (nv.includes('cpp') || nv.includes('inss') || nv.includes('previdenci'))) colMap.cpp = c;
+      if (colMap.icms === undefined && nv === 'icms') colMap.icms = c;
+      if (colMap.iss === undefined && (nv.includes('iss') || nv === 'issqn')) colMap.iss = c;
     }
   }
 
+  // Percorre linhas de valor e acumula
   for (let r = partilhaStart + 2; r <= Math.min(range.e.r, partilhaStart + 50); r++) {
     const rowLabel = extractCellValue(sheet, r, 0);
-    if (rowLabel && normalizeStr(String(rowLabel)).includes('total')) break;
+    const nl = rowLabel ? normalizeStr(String(rowLabel)) : '';
+    // Para ao encontrar totais ou fim da seção de partilha
+    if (nl.includes('total') || nl.includes('simples nacional') || nl.includes('sistema licenciado')) break;
 
+    // Procura célula "Valor:" em qualquer coluna desta linha
     let isValueRow = false;
     for (let c = 0; c <= range.e.c; c++) {
       const v = extractCellValue(sheet, r, c);
@@ -232,13 +238,14 @@ export function extractPartilha(sheet) {
     }
     if (!isValueRow) continue;
 
-    if (colMap.irpj >= 0) { const v = extractCellValue(sheet, r, colMap.irpj); if (typeof v === 'number') result.valor_irpj += v; }
-    if (colMap.csll >= 0) { const v = extractCellValue(sheet, r, colMap.csll); if (typeof v === 'number') result.valor_csll += v; }
-    if (colMap.cofins >= 0) { const v = extractCellValue(sheet, r, colMap.cofins); if (typeof v === 'number') result.valor_cofins += v; }
-    if (colMap.pis >= 0) { const v = extractCellValue(sheet, r, colMap.pis); if (typeof v === 'number') result.valor_pis += v; }
-    if (colMap.cpp >= 0) { const v = extractCellValue(sheet, r, colMap.cpp); if (typeof v === 'number') result.valor_cpp += v; }
-    if (colMap.icms >= 0) { const v = extractCellValue(sheet, r, colMap.icms); if (typeof v === 'number') result.valor_icms += v; }
-    if (colMap.iss >= 0) { const v = extractCellValue(sheet, r, colMap.iss); if (typeof v === 'number') result.valor_iss += v; }
+    // Acumula valores de cada imposto mapeado
+    if (colMap.irpj !== undefined) { const v = extractCellValue(sheet, r, colMap.irpj); if (typeof v === 'number') result.valor_irpj += v; }
+    if (colMap.csll !== undefined) { const v = extractCellValue(sheet, r, colMap.csll); if (typeof v === 'number') result.valor_csll += v; }
+    if (colMap.cofins !== undefined) { const v = extractCellValue(sheet, r, colMap.cofins); if (typeof v === 'number') result.valor_cofins += v; }
+    if (colMap.pis !== undefined) { const v = extractCellValue(sheet, r, colMap.pis); if (typeof v === 'number') result.valor_pis += v; }
+    if (colMap.cpp !== undefined) { const v = extractCellValue(sheet, r, colMap.cpp); if (typeof v === 'number') result.valor_cpp += v; }
+    if (colMap.icms !== undefined) { const v = extractCellValue(sheet, r, colMap.icms); if (typeof v === 'number') result.valor_icms += v; }
+    if (colMap.iss !== undefined) { const v = extractCellValue(sheet, r, colMap.iss); if (typeof v === 'number') result.valor_iss += v; }
   }
 
   return result;
