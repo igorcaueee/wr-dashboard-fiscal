@@ -78,10 +78,7 @@ export default function UploadSimples() {
       setError('O relatório Simples Nacional é obrigatório.');
       return;
     }
-    if (empresa.tipo_empresa !== 'somente_servico' && !entradasFile) {
-      setError('O relatório de Entradas por CFOP é obrigatório para este tipo de empresa.');
-      return;
-    }
+
     if (!periodoMes) {
       setError('Selecione o mês de referência.');
       return;
@@ -303,8 +300,7 @@ export default function UploadSimples() {
           {empresa && empresa.tipo_empresa !== 'somente_servico' && (
             <div className="space-y-2">
               <Label>
-                Relatório Domínio — Entradas por CFOP{' '}
-                <span className="text-destructive">*</span>
+                Relatório Domínio — Entradas por CFOP (opcional)
               </Label>
               <FileDropZone
                 file={entradasFile}
