@@ -24,33 +24,20 @@ export function parse(workbook) {
   Object.assign(result, extractFaixaFator(sheet));
 
   // Seções — somente Anexo III (serviços)
-  // Passo 1: mapear linhas que identificam a seção (pode estar acima ou abaixo da receita)
-  const sectionMarkers = [];
+  // Anexo e Seção podem vir em linhas separadas no relatório Domínio; rastreamos estado entre linhas
+  let currentSection = null;
   for (let r = 0; r <= range.e.r; r++) {
     for (const checkCol of [0, 4]) {
       const val = extractCellValue(sheet, r, checkCol);
       if (!val) continue;
       const nv = normalizeStr(String(val));
-      if (nv.includes('anexo iii')) sectionMarkers.push({ row: r, section: 'servicos' });
+      if (nv.includes('anexo iii')) currentSection = 'servicos';
     }
-  }
-
-  // Passo 2: para cada "Receita Tributada Total", encontrar a seção mais próxima (até 20 linhas)
-  for (let r = 0; r <= range.e.r; r++) {
     const label0 = extractCellValue(sheet, r, 0);
     if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
       const valor = extractCellValue(sheet, r, 12);
       if (typeof valor === 'number') {
-        let nearest = null;
-        let minDist = Infinity;
-        for (const m of sectionMarkers) {
-          const dist = Math.abs(m.row - r);
-          if (dist < minDist && dist <= 20) {
-            minDist = dist;
-            nearest = m.section;
-          }
-        }
-        if (nearest === 'servicos') result.total_servicos = (result.total_servicos || 0) + valor;
+        if (currentSection === 'servicos') result.total_servicos = (result.total_servicos || 0) + valor;
       }
     }
   }

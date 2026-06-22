@@ -25,41 +25,38 @@ export function parse(workbookSimples, workbookEntradas) {
   Object.assign(result, extractFaixaFator(sheet));
 
   // Seções — Anexo I Seção I, Seção II e Anexo III
-  // Passo 1: mapear todas as linhas que identificam seções (podem estar acima ou abaixo das receitas)
-  const sectionMarkers = [];
+  // Anexo e Seção vêm em linhas separadas no relatório Domínio; rastreamos estado entre linhas
+  let currentAnnex = null;
+  let currentSection = null;
   for (let r = 0; r <= range.e.r; r++) {
     for (const checkCol of [0, 4]) {
       const val = extractCellValue(sheet, r, checkCol);
       if (!val) continue;
       const nv = normalizeStr(String(val));
-      if (nv.includes('anexo i') && nv.includes('seção i') && !nv.includes('seção ii')) {
-        sectionMarkers.push({ row: r, section: 'sem_st' });
-      } else if (nv.includes('anexo i') && nv.includes('seção ii')) {
-        sectionMarkers.push({ row: r, section: 'com_st' });
+      // Rastrear anexo
+      if (nv.includes('anexo i') && !nv.includes('anexo ii') && !nv.includes('anexo iii')) {
+        currentAnnex = 'i';
       } else if (nv.includes('anexo iii')) {
-        sectionMarkers.push({ row: r, section: 'servicos' });
+        currentAnnex = 'iii';
+        currentSection = 'servicos';
+      }
+      // Rastrear seção dentro do anexo atual
+      if (currentAnnex === 'i') {
+        if (nv.includes('seção i') && !nv.includes('seção ii')) {
+          currentSection = 'sem_st';
+        } else if (nv.includes('seção ii')) {
+          currentSection = 'com_st';
+        }
       }
     }
-  }
-
-  // Passo 2: para cada "Receita Tributada Total", encontrar a seção mais próxima (até 20 linhas)
-  for (let r = 0; r <= range.e.r; r++) {
+    // Capturar receita da seção atual
     const label0 = extractCellValue(sheet, r, 0);
     if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
       const valor = extractCellValue(sheet, r, 12);
       if (typeof valor === 'number') {
-        let nearest = null;
-        let minDist = Infinity;
-        for (const m of sectionMarkers) {
-          const dist = Math.abs(m.row - r);
-          if (dist < minDist && dist <= 20) {
-            minDist = dist;
-            nearest = m.section;
-          }
-        }
-        if (nearest === 'sem_st') result.total_saidas_sem_st = (result.total_saidas_sem_st || 0) + valor;
-        else if (nearest === 'com_st') result.total_saidas_st = (result.total_saidas_st || 0) + valor;
-        else if (nearest === 'servicos') result.total_servicos = (result.total_servicos || 0) + valor;
+        if (currentSection === 'sem_st') result.total_saidas_sem_st = (result.total_saidas_sem_st || 0) + valor;
+        else if (currentSection === 'com_st') result.total_saidas_st = (result.total_saidas_st || 0) + valor;
+        else if (currentSection === 'servicos') result.total_servicos = (result.total_servicos || 0) + valor;
       }
     }
   }
