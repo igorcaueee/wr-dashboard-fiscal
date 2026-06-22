@@ -220,7 +220,7 @@ export default function Dashboard() {
               <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
                 <SelectTrigger className="w-44 bg-white/10 border-white/20 text-white data-[placeholder]:text-white/60">
                   <Calendar className="w-4 h-4 mr-1" />
-                  <SelectValue placeholder="Mês específico" />
+                  <SelectValue placeholder="Visão geral" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={null}>Visão geral</SelectItem>
