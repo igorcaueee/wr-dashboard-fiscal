@@ -300,26 +300,43 @@ export function parseEntradas(workbook) {
 
   const colValorContabil = findColumnByHeader(sheet, headerRow, ['valor contabil', 'valor contábil']);
   const colBaseCalculo = findColumnByHeader(sheet, headerRow, ['base calculo', 'base cálculo']);
-  const colValor = findColumnByHeader(sheet, headerRow, ['valor']);
   const colTipo = findColumnByHeader(sheet, headerRow, ['tipo']);
+
+  // Find standalone "Valor" column — skip "Valor Contábil" which matches first
+  let colValor = -1;
+  for (let c = 0; c <= range.e.c; c++) {
+    if (c === colValorContabil) continue;
+    const val = extractCellValue(sheet, headerRow, c);
+    if (val && normalizeStr(String(val)).includes('valor') && !normalizeStr(String(val)).includes('contabil')) {
+      colValor = c;
+      break;
+    }
+  }
 
   let totalGeralRow = -1;
   for (let r = 0; r <= range.e.r; r++) {
-    const val = extractCellValue(sheet, r, 0);
-    if (val && normalizeStr(String(val)) === 'total geral') { totalGeralRow = r; break; }
+    for (let c = 0; c <= Math.min(5, range.e.c); c++) {
+      const val = extractCellValue(sheet, r, c);
+      if (val && normalizeStr(String(val)) === 'total geral') { totalGeralRow = r; break; }
+    }
+    if (totalGeralRow >= 0) break;
   }
 
   if (totalGeralRow >= 0) {
+    // Total Geral value may be on the same row or the next rows
     if (colValorContabil >= 0) {
-      const v = extractCellValue(sheet, totalGeralRow, colValorContabil);
-      if (typeof v === 'number') result.total_entradas = v;
+      for (let r = totalGeralRow; r <= Math.min(totalGeralRow + 3, range.e.r); r++) {
+        const v = extractCellValue(sheet, r, colValorContabil);
+        if (typeof v === 'number') { result.total_entradas = v; break; }
+      }
     }
-    for (let r = totalGeralRow; r <= Math.min(totalGeralRow + 3, range.e.r); r++) {
+    // Find ICMS base and value in rows after Total Geral
+    for (let r = totalGeralRow; r <= Math.min(totalGeralRow + 4, range.e.r); r++) {
       const label = extractCellValue(sheet, r, 0);
       const tipoVal = extractCellValue(sheet, r, colTipo >= 0 ? colTipo : 1);
       const isICMS = (label && normalizeStr(String(label)).includes('icms')) ||
         (tipoVal && normalizeStr(String(tipoVal)).includes('icms'));
-      if (isICMS || r === totalGeralRow) {
+      if (isICMS) {
         if (colBaseCalculo >= 0 && result.base_calculo_icms_entradas === undefined) {
           const v = extractCellValue(sheet, r, colBaseCalculo);
           if (typeof v === 'number') result.base_calculo_icms_entradas = v;
