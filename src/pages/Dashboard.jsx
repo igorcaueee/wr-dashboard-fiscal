@@ -117,8 +117,7 @@ export default function Dashboard() {
 
   // Calculate totals for summary cards
   const totalUltimoMes = ultimaApuracao
-    ? (ultimaApuracao.total_entradas || 0) +
-      (ultimaApuracao.total_servicos || 0) +
+    ? (ultimaApuracao.total_servicos || 0) +
       ((ultimaApuracao.total_saidas_sem_st || 0) + (ultimaApuracao.total_saidas_st || 0))
     : 0;
 
