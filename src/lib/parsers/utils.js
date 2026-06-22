@@ -159,19 +159,26 @@ export function extractFaixaFator(sheet) {
   }
 
   if (faixaRow >= 0) {
-    // Procura apenas nas células vizinhas ao rótulo (mesma linha, colunas à direita imediata)
-    // e na linha seguinte (relatórios podem quebrar o valor para a linha de baixo)
+    // A faixa correta está na mesma célula do rótulo (ex: "Faixa de Enquadramento: 720.000,01 a 1.800.000,00")
+    // ou na 1ª/2ª célula à direita. A tabela de referência (com todas as faixas) fica bem mais longe.
     const faixaPattern = /[\d.]+,\d+\s+a\s+[\d.]+,\d+/;
-    for (let r = faixaRow; r <= Math.min(faixaRow + 2, range.e.r); r++) {
-      const startCol = r === faixaRow ? faixaLabelCol + 1 : 0;
-      for (let c = startCol; c <= Math.min(startCol + 8, range.e.c); c++) {
-        const val = extractCellValue(sheet, r, c);
+    // 1) Verifica a própria célula do rótulo (valor pode estar concatenado nela)
+    const labelCellVal = extractCellValue(sheet, faixaRow, faixaLabelCol);
+    if (labelCellVal) {
+      const match = String(labelCellVal).match(faixaPattern);
+      if (match) {
+        result.faixa_enquadramento = match[0];
+      }
+    }
+    // 2) Se não encontrou, busca só nas 3 colunas seguintes à direita
+    if (!result.faixa_enquadramento) {
+      for (let c = faixaLabelCol + 1; c <= Math.min(faixaLabelCol + 3, range.e.c); c++) {
+        const val = extractCellValue(sheet, faixaRow, c);
         if (val && faixaPattern.test(String(val))) {
-          result.faixa_enquadramento = String(val);
+          result.faixa_enquadramento = String(val).match(faixaPattern)[0];
           break;
         }
       }
-      if (result.faixa_enquadramento) break;
     }
   }
 
