@@ -41,8 +41,8 @@ export function parse(workbookSimples, workbookEntradas) {
     if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
       const valor = extractCellValue(sheet, r, 12);
       if (typeof valor === 'number') {
-        if (currentSection === 'sem_st') result.total_saidas_sem_st = valor;
-        else if (currentSection === 'com_st') result.total_saidas_st = valor;
+        if (currentSection === 'sem_st') result.total_saidas_sem_st = (result.total_saidas_sem_st || 0) + valor;
+        else if (currentSection === 'com_st') result.total_saidas_st = (result.total_saidas_st || 0) + valor;
       }
     }
   }
