@@ -26,6 +26,12 @@ export function parse(workbookSimples, workbookEntradas) {
 
   // Seções — Anexo I Seção I, Seção II e Anexo III
   // Anexo e Seção vêm em linhas separadas no relatório Domínio; rastreamos estado entre linhas
+  const SECAO_I = normalizeStr('seção i');
+  const SECAO_II = normalizeStr('seção ii');
+  const ANEXO_I = normalizeStr('anexo i');
+  const ANEXO_II = normalizeStr('anexo ii');
+  const ANEXO_III = normalizeStr('anexo iii');
+  const RECEITA_TRIBUTADA = normalizeStr('receita tributada total');
   let currentAnnex = null;
   let currentSection = null;
   for (let r = 0; r <= range.e.r; r++) {
@@ -34,24 +40,24 @@ export function parse(workbookSimples, workbookEntradas) {
       if (!val) continue;
       const nv = normalizeStr(String(val));
       // Rastrear anexo
-      if (nv.includes('anexo i') && !nv.includes('anexo ii') && !nv.includes('anexo iii')) {
+      if (nv.includes(ANEXO_I) && !nv.includes(ANEXO_II) && !nv.includes(ANEXO_III)) {
         currentAnnex = 'i';
-      } else if (nv.includes('anexo iii')) {
+      } else if (nv.includes(ANEXO_III)) {
         currentAnnex = 'iii';
         currentSection = 'servicos';
       }
       // Rastrear seção dentro do anexo atual
       if (currentAnnex === 'i') {
-        if (nv.includes('seção i') && !nv.includes('seção ii')) {
+        if (nv.includes(SECAO_I) && !nv.includes(SECAO_II)) {
           currentSection = 'sem_st';
-        } else if (nv.includes('seção ii')) {
+        } else if (nv.includes(SECAO_II)) {
           currentSection = 'com_st';
         }
       }
     }
     // Capturar receita da seção atual
     const label0 = extractCellValue(sheet, r, 0);
-    if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
+    if (label0 && normalizeStr(String(label0)).includes(RECEITA_TRIBUTADA)) {
       const valor = extractCellValue(sheet, r, 12);
       if (typeof valor === 'number') {
         if (currentSection === 'sem_st') result.total_saidas_sem_st = (result.total_saidas_sem_st || 0) + valor;

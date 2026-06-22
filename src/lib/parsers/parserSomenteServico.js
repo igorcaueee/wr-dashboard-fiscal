@@ -25,16 +25,18 @@ export function parse(workbook) {
 
   // Seções — somente Anexo III (serviços)
   // Anexo e Seção podem vir em linhas separadas no relatório Domínio; rastreamos estado entre linhas
+  const ANEXO_III = normalizeStr('anexo iii');
+  const RECEITA_TRIBUTADA = normalizeStr('receita tributada total');
   let currentSection = null;
   for (let r = 0; r <= range.e.r; r++) {
     for (const checkCol of [0, 4]) {
       const val = extractCellValue(sheet, r, checkCol);
       if (!val) continue;
       const nv = normalizeStr(String(val));
-      if (nv.includes('anexo iii')) currentSection = 'servicos';
+      if (nv.includes(ANEXO_III)) currentSection = 'servicos';
     }
     const label0 = extractCellValue(sheet, r, 0);
-    if (label0 && normalizeStr(String(label0)).includes('receita tributada total')) {
+    if (label0 && normalizeStr(String(label0)).includes(RECEITA_TRIBUTADA)) {
       const valor = extractCellValue(sheet, r, 12);
       if (typeof valor === 'number') {
         if (currentSection === 'servicos') result.total_servicos = (result.total_servicos || 0) + valor;
