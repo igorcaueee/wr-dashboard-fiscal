@@ -416,6 +416,7 @@ export default function Dashboard() {
                       tick={{ fontSize: 11, fill: '#6b7280' }}
                       axisLine={false}
                       tickLine={false}
+                      width={100}
                       tickFormatter={(v) => formatBRL(v)}
                     />
                     <Tooltip
@@ -477,11 +478,12 @@ export default function Dashboard() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                       <YAxis
-                        yAxisId="left"
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(v) => formatBRL(v)}
+                       yAxisId="left"
+                       tick={{ fontSize: 11, fill: '#6b7280' }}
+                       axisLine={false}
+                       tickLine={false}
+                       width={100}
+                       tickFormatter={(v) => formatBRL(v)}
                       />
                       <YAxis
                         yAxisId="right"
