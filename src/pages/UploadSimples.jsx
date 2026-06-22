@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +46,17 @@ export default function UploadSimples() {
     queryKey: ['empresas'],
     queryFn: () => base44.entities.Empresa.list('-created_date', 100),
   });
+
+  // Limpar arquivos ao trocar o mês/ano de referência
+  useEffect(() => {
+    setSimplesFile(null);
+    setEntradasFile(null);
+    setResult(null);
+    setError(null);
+    setCnpjWarning(null);
+    setConfirmReplace(false);
+    setPendingData(null);
+  }, [periodoMes, periodoAno]);
 
   const empresa = empresas.find((e) => e.id === empresaId);
 
