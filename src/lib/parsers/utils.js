@@ -143,15 +143,35 @@ export function extractFaixaFator(sheet) {
   const range = XLSX.utils.decode_range(sheet['!ref']);
   const result = {};
 
-  const faixaRow = findRowByLabel(sheet, 'Faixa de Enquadramento');
-  if (faixaRow >= 0) {
-    // Procura valor no formato brasileiro com separadores de milhar: ex "720.000,01 a 1.800.000,00"
-    for (let c = 1; c <= range.e.c; c++) {
-      const val = extractCellValue(sheet, faixaRow, c);
-      if (val && String(val).match(/[\d.]+,\d+\s+a\s+[\d.]+,\d+/)) {
-        result.faixa_enquadramento = String(val);
+  // Encontra a coluna exata do rótulo "Faixa de Enquadramento"
+  let faixaRow = -1;
+  let faixaLabelCol = 0;
+  for (let r = 0; r <= range.e.r; r++) {
+    for (let c = 0; c <= Math.min(5, range.e.c); c++) {
+      const val = extractCellValue(sheet, r, c);
+      if (val && normalizeStr(String(val)).includes(normalizeStr('Faixa de Enquadramento'))) {
+        faixaRow = r;
+        faixaLabelCol = c;
         break;
       }
+    }
+    if (faixaRow >= 0) break;
+  }
+
+  if (faixaRow >= 0) {
+    // Procura apenas nas células vizinhas ao rótulo (mesma linha, colunas à direita imediata)
+    // e na linha seguinte (relatórios podem quebrar o valor para a linha de baixo)
+    const faixaPattern = /[\d.]+,\d+\s+a\s+[\d.]+,\d+/;
+    for (let r = faixaRow; r <= Math.min(faixaRow + 2, range.e.r); r++) {
+      const startCol = r === faixaRow ? faixaLabelCol + 1 : 0;
+      for (let c = startCol; c <= Math.min(startCol + 8, range.e.c); c++) {
+        const val = extractCellValue(sheet, r, c);
+        if (val && faixaPattern.test(String(val))) {
+          result.faixa_enquadramento = String(val);
+          break;
+        }
+      }
+      if (result.faixa_enquadramento) break;
     }
   }
 
