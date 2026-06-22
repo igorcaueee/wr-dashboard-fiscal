@@ -94,20 +94,6 @@ export default function Dashboard() {
     }));
   }, [ultimosMeses]);
 
-  // Partilha data — agregado do período visível
-  const partilhaData = useMemo(() => {
-    if (!agregados?.partilha) return [];
-    return [
-      { name: 'IRPJ', value: agregados.partilha.valor_irpj },
-      { name: 'CSLL', value: agregados.partilha.valor_csll },
-      { name: 'COFINS', value: agregados.partilha.valor_cofins },
-      { name: 'PIS', value: agregados.partilha.valor_pis },
-      { name: 'CPP', value: agregados.partilha.valor_cpp },
-      { name: 'ICMS', value: agregados.partilha.valor_icms },
-      { name: 'ISS', value: agregados.partilha.valor_iss },
-    ].filter((d) => d.value > 0);
-  }, [agregados]);
-
   const PARTILHA_COLORS = ['#0d9488', '#14b8a6', '#f97316', '#fb923c', '#7c3aed', '#a78bfa', '#e11d48'];
 
   const tipoEmpresa = empresa?.tipo_empresa || 'somente_servico';
@@ -134,6 +120,20 @@ export default function Dashboard() {
     };
     return { simplesTotal, receitaTotal, faturamentoTotal, aliquotaEfetiva, partilha };
   }, [ultimosMeses]);
+
+  // Partilha data — agregado do período visível
+  const partilhaData = useMemo(() => {
+    if (!agregados?.partilha) return [];
+    return [
+      { name: 'IRPJ', value: agregados.partilha.valor_irpj },
+      { name: 'CSLL', value: agregados.partilha.valor_csll },
+      { name: 'COFINS', value: agregados.partilha.valor_cofins },
+      { name: 'PIS', value: agregados.partilha.valor_pis },
+      { name: 'CPP', value: agregados.partilha.valor_cpp },
+      { name: 'ICMS', value: agregados.partilha.valor_icms },
+      { name: 'ISS', value: agregados.partilha.valor_iss },
+    ].filter((d) => d.value > 0);
+  }, [agregados]);
 
   const handleExportPDF = async () => {
     const { default: html2canvas } = await import('html2canvas');
