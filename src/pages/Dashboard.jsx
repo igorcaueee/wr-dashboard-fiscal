@@ -141,36 +141,89 @@ export default function Dashboard() {
     const element = document.getElementById('dashboard-content');
     if (!element) return;
 
-    // Temporariamente força largura fixa A4 para captura uniforme
+    const nome = empresa?.nome || '';
+    const cnpj = empresa?.cnpj || '';
+    const periodoLabel = ultimosMeses.length > 0
+      ? `De ${formatMesAno(ultimosMeses[0].periodo)} a ${formatMesAno(ultimosMeses[ultimosMeses.length - 1].periodo)}`
+      : '';
+
+    // Captura o conteúdo com largura fixa para consistência no PDF
+    const captureWidth = 750;
     const originalWidth = element.style.width;
-    element.style.width = '794px'; // ~210mm em 96dpi
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true, windowWidth: 794 });
+    element.style.width = captureWidth + 'px';
+    const canvas = await html2canvas(element, {
+      scale: 1.5,
+      useCORS: true,
+      windowWidth: captureWidth,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
     element.style.width = originalWidth;
 
-    const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const marginX = 8; // mm
-    const marginY = 8;
-    const imgWidth = pageWidth - marginX * 2;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const marginX = 10;
+    const marginTop = 10;
+    const marginBottom = 8;
+    const headerH = nome ? 22 : 0; // altura do cabeçalho em mm
 
-    // Se a imagem for mais alta que uma página, divide em múltiplas
-    const pageHeight = pdf.internal.pageSize.getHeight() - marginY * 2;
-    let heightLeft = imgHeight;
-    let position = marginY;
-
-    pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      position = marginY - (imgHeight - heightLeft);
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+    // Cabeçalho com nome, CNPJ e período (em todas as páginas)
+    function drawHeader(pdfDoc) {
+      if (!nome) return;
+      pdfDoc.setFillColor(0, 123, 138); // #007B8A
+      pdfDoc.rect(marginX, marginTop, pageW - marginX * 2, headerH, 'F');
+      pdfDoc.setTextColor(255, 255, 255);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.setFontSize(12);
+      pdfDoc.text(nome, marginX + 4, marginTop + 7);
+      pdfDoc.setFont('helvetica', 'normal');
+      pdfDoc.setFontSize(8);
+      pdfDoc.text(`CNPJ: ${cnpj}`, marginX + 4, marginTop + 14);
+      pdfDoc.text(`Período: ${periodoLabel}`, pdfDoc.internal.pageSize.getWidth() - marginX - 4, marginTop + 14, { align: 'right' });
+      pdfDoc.setTextColor(51, 51, 51);
     }
 
-    pdf.save(`dashboard-${empresa?.nome || 'fiscal'}.pdf`);
+    // Imagem do conteúdo
+    const imgData = canvas.toDataURL('image/png');
+    const contentStartY = marginTop + headerH + (headerH ? 4 : 0);
+    const availableH = pageH - contentStartY - marginBottom;
+    const imgWidth = pageW - marginX * 2;
+    const totalImgH = (canvas.height * imgWidth) / canvas.width;
+
+    let remainingH = totalImgH;
+    let pageNum = 0;
+
+    while (remainingH > 0) {
+      if (pageNum > 0) pdf.addPage();
+      drawHeader(pdf);
+
+      const sliceH = Math.min(remainingH, availableH);
+      // Posição Y na imagem fonte correspondente a este slice
+      const srcY = totalImgH - remainingH;
+      const srcH = totalImgH; // altura total da imagem fonte
+
+      // Posição no PDF
+      const destY = contentStartY;
+
+      // Recorta a porção visível da imagem e desenha
+      // Criamos um canvas auxiliar com o slice
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = Math.round((sliceH / totalImgH) * canvas.height);
+      const ctx = sliceCanvas.getContext('2d');
+      const srcSliceY = Math.round((srcY / totalImgH) * canvas.height);
+      const srcSliceH = sliceCanvas.height;
+      ctx.drawImage(canvas, 0, srcSliceY, canvas.width, srcSliceH, 0, 0, canvas.width, srcSliceH);
+      const sliceData = sliceCanvas.toDataURL('image/png');
+
+      pdf.addImage(sliceData, 'PNG', marginX, destY, imgWidth, sliceH);
+
+      remainingH -= availableH;
+      pageNum++;
+    }
+
+    pdf.save(`dashboard-${nome || 'fiscal'}.pdf`);
   };
 
   if (empresas.length === 0) {
