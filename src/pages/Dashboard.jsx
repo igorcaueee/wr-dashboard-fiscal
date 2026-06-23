@@ -521,8 +521,8 @@ export default function Dashboard() {
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">RBT12 do período {ultimaApuracao.periodo}</p>
                     {ultimaApuracao.faixa_enquadramento && (
-                      <p className="text-xs text-muted-foreground mt-3 bg-muted inline-block px-3 py-1 rounded-full">
-                        {ultimaApuracao.faixa_enquadramento}
+                      <p className="text-sm font-medium text-primary mt-3">
+                        Faixa de Enquadramento: {ultimaApuracao.faixa_enquadramento}
                       </p>
                     )}
                   </div>
@@ -599,14 +599,14 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col lg:flex-row items-center gap-6">
-                  <ResponsiveContainer width="100%" height={300} className="max-w-sm">
-                    <PieChart>
+                  <ResponsiveContainer width="100%" height={320} className="lg:min-w-[400px]">
+                    <PieChart margin={{ top: 10, right: 60, bottom: 10, left: 10 }}>
                       <Pie
                         data={partilhaData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={110}
+                        innerRadius={55}
+                        outerRadius={100}
                         paddingAngle={3}
                         dataKey="value"
                         label={({ name, value }) => `${name}: ${formatBRL(value)}`}
