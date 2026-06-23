@@ -148,7 +148,7 @@ export default function Dashboard() {
       : '';
 
     // Captura o conteúdo com largura fixa para consistência no PDF
-    const captureWidth = 750;
+    const captureWidth = 1100;
     const originalWidth = element.style.width;
     element.style.width = captureWidth + 'px';
     const canvas = await html2canvas(element, {
@@ -507,7 +507,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Section 2: Receita Bruta Acumulada */}
             <Card>
               <CardHeader>
