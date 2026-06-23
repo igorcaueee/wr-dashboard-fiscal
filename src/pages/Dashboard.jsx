@@ -507,7 +507,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Section 2: Receita Bruta Acumulada */}
             <Card>
               <CardHeader>
@@ -535,9 +535,9 @@ export default function Dashboard() {
             {/* Section 3: Imposto */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-semibold text-center">Imposto</CardTitle>
+                <CardTitle className="text-base font-semibold">Imposto</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col items-center">
+              <CardContent>
                 {impostoData.length === 0 ? (
                   <EmptyChartMsg msg="Sem dados de imposto." small />
                 ) : (
