@@ -533,17 +533,17 @@ export default function Dashboard() {
             </Card>
 
             {/* Section 3: Imposto */}
-            <Card>
-              <CardHeader className="px-6">
-                <CardTitle className="text-base font-semibold">Imposto</CardTitle>
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold pl-1">Imposto</CardTitle>
               </CardHeader>
-              <CardContent className="px-2">
+              <CardContent className="px-0">
                 {impostoData.length === 0 ? (
                   <EmptyChartMsg msg="Sem dados de imposto." small />
                 ) : (
-                  <div className="flex justify-center">
-                    <ResponsiveContainer width="95%" height={280}>
-                    <ComposedChart data={impostoData}>
+                  <div className="w-full flex justify-center">
+                    <ResponsiveContainer width="90%" height={280}>
+                    <ComposedChart data={impostoData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                       <YAxis
