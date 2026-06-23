@@ -563,7 +563,7 @@ export default function Dashboard() {
                         tickFormatter={(v) => formatPercent(v)}
                       />
                       <Tooltip
-                        formatter={(value, name) => name === 'aliquota' ? formatPercent(value) : formatBRL(value)}
+                        formatter={(value, name) => name === 'Alíquota Efetiva' ? formatPercent(value) : formatBRL(value)}
                         contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '13px' }}
                       />
                       <Legend wrapperStyle={{ fontSize: '12px' }} />
