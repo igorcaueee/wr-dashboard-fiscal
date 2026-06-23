@@ -507,7 +507,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
             {/* Section 2: Receita Bruta Acumulada */}
             <Card>
               <CardHeader>
