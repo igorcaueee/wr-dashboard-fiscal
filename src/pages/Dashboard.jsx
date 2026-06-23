@@ -600,8 +600,8 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-semibold">Partilha do Simples Nacional</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col lg:flex-row items-center gap-6">
-                  <ResponsiveContainer width="100%" height={320} className="lg:min-w-[400px]">
+                <div className="flex flex-col lg:flex-row items-center justify-center gap-4">
+                  <ResponsiveContainer width={280} height={280} className="flex-shrink-0">
                     <PieChart margin={{ top: 10, right: 60, bottom: 10, left: 10 }}>
                       <Pie
                         data={partilhaData}
