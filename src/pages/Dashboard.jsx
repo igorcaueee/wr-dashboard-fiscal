@@ -609,8 +609,7 @@ export default function Dashboard() {
                         outerRadius={100}
                         paddingAngle={3}
                         dataKey="value"
-                        label={({ name, value }) => `${name}: ${formatBRL(value)}`}
-                        labelLine={{ stroke: '#9ca3af', strokeWidth: 1 }}
+                        label={false}
                       >
                         {partilhaData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={PARTILHA_COLORS[index % PARTILHA_COLORS.length]} />
@@ -619,14 +618,14 @@ export default function Dashboard() {
                       <Tooltip formatter={(value) => formatBRL(value)} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm min-w-[280px]">
                     {partilhaData.map((d, i) => (
-                      <div key={d.name} className="flex items-center gap-2">
+                      <div key={d.name} className="flex items-center gap-2 whitespace-nowrap">
                         <div
                           className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: PARTILHA_COLORS[i % PARTILHA_COLORS.length] }}
                         />
-                        <span className="text-muted-foreground">{d.name}</span>
+                        <span className="text-muted-foreground flex-shrink-0">{d.name}</span>
                         <span className="font-medium ml-auto">{formatBRL(d.value)}</span>
                       </div>
                     ))}
