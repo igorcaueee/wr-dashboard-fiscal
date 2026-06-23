@@ -535,9 +535,9 @@ export default function Dashboard() {
             {/* Section 3: Imposto */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-semibold">Imposto</CardTitle>
+                <CardTitle className="text-base font-semibold text-center">Imposto</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col items-center">
                 {impostoData.length === 0 ? (
                   <EmptyChartMsg msg="Sem dados de imposto." small />
                 ) : (
