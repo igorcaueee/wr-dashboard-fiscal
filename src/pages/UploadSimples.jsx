@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Upload,
-  FileSpreadsheet,
+  FileText,
   AlertCircle,
   CheckCircle2,
   Loader2,
@@ -16,17 +16,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { parse as parseSomenteServico } from '@/lib/parsers/parserSomenteServico';
-import { parse as parseEntradasSaidas } from '@/lib/parsers/parserEntradasSaidas';
-import { parse as parseEntradasSaidasServicos } from '@/lib/parsers/parserEntradasSaidasServicos';
+import { parsePGDAS } from '@/lib/parsers/parserPGDAS';
+import { parseEntradas } from '@/lib/parsers/utils';
 
 const tipoLabels = {
   somente_servico: 'Somente Prestação de Serviços',
   entradas_saidas: 'Entradas e Saídas (Comércio)',
   entradas_saidas_servicos: 'Entradas, Saídas e Serviços (Comércio + Serviços)',
 };
-
-// ---- Component ----
 
 export default function UploadSimples() {
   const queryClient = useQueryClient();
@@ -39,24 +36,11 @@ export default function UploadSimples() {
   const [cnpjWarning, setCnpjWarning] = useState(null);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [pendingData, setPendingData] = useState(null);
-  const [periodoMes, setPeriodoMes] = useState('');
-  const [periodoAno, setPeriodoAno] = useState(String(new Date().getFullYear()));
 
   const { data: empresas = [] } = useQuery({
     queryKey: ['empresas'],
     queryFn: () => base44.entities.Empresa.list('-created_date', 100),
   });
-
-  // Limpar arquivos ao trocar o mês/ano de referência
-  useEffect(() => {
-    setSimplesFile(null);
-    setEntradasFile(null);
-    setResult(null);
-    setError(null);
-    setCnpjWarning(null);
-    setConfirmReplace(false);
-    setPendingData(null);
-  }, [periodoMes, periodoAno]);
 
   const empresa = empresas.find((e) => e.id === empresaId);
 
@@ -64,7 +48,7 @@ export default function UploadSimples() {
     mutationFn: (data) => base44.entities.Apuracao.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
-      setResult({ success: true, message: 'Relatórios processados com sucesso!' });
+      setResult({ success: true, message: 'Declaração processada com sucesso!' });
       setProcessing(false);
       setConfirmReplace(false);
       setPendingData(null);
@@ -81,44 +65,20 @@ export default function UploadSimples() {
     setResult(null);
     setConfirmReplace(false);
 
-    if (!empresaId) {
-      setError('Selecione uma empresa.');
-      return;
-    }
-    if (!simplesFile) {
-      setError('O relatório Simples Nacional é obrigatório.');
-      return;
-    }
-
-    if (!periodoMes) {
-      setError('Selecione o mês de referência.');
-      return;
-    }
+    if (!empresaId) { setError('Selecione uma empresa.'); return; }
+    if (!simplesFile) { setError('O arquivo PGDAS-D é obrigatório.'); return; }
 
     setProcessing(true);
 
     try {
-      // Carregar workbooks
-      const simplesData = await readXLSX(simplesFile);
-      const simplesWorkbook = XLSX.read(simplesData, { type: 'array' });
+      // Parse PDF PGDAS-D via AI
+      const parsed = await parsePGDAS(simplesFile);
 
-      let entradasWorkbook = null;
-      if (entradasFile) {
-        const entradasData = await readXLSX(entradasFile);
-        entradasWorkbook = XLSX.read(entradasData, { type: 'array' });
+      if (!parsed.periodo) {
+        throw new Error('Não foi possível identificar o período no documento.');
       }
 
-      // Selecionar parser conforme o tipo da empresa
-      let parsed;
-      if (empresa.tipo_empresa === 'somente_servico') {
-        parsed = parseSomenteServico(simplesWorkbook);
-      } else if (empresa.tipo_empresa === 'entradas_saidas') {
-        parsed = parseEntradasSaidas(simplesWorkbook, entradasWorkbook);
-      } else {
-        parsed = parseEntradasSaidasServicos(simplesWorkbook, entradasWorkbook);
-      }
-
-      // Check CNPJ
+      // Validar CNPJ
       const cnpjEmpresa = empresa.cnpj ? empresa.cnpj.replace(/\D/g, '') : '';
       if (parsed._cnpj && cnpjEmpresa && parsed._cnpj !== cnpjEmpresa) {
         setCnpjWarning(
@@ -126,13 +86,24 @@ export default function UploadSimples() {
         );
       }
 
-      // Build data payload
-      const periodo = `${periodoMes}/${periodoAno}`;
+      // Parse entradas XLSX (opcional)
+      if (entradasFile) {
+        const entradasData = await readFileAsArray(entradasFile);
+        const workbook = XLSX.read(entradasData, { type: 'array' });
+        const entradas = parseEntradas(workbook);
+        parsed.total_entradas = entradas.total_entradas || 0;
+        parsed.base_calculo_icms_entradas = entradas.base_calculo_icms_entradas || 0;
+        parsed.valor_icms_entradas = entradas.valor_icms_entradas || 0;
+      }
+
+      const receita = parsed.receita_bruta_periodo || 0;
+      const simples = parsed.simples_nacional_total || 0;
+
       const payload = {
         empresa_id: empresaId,
-        periodo,
+        periodo: parsed.periodo,
         tipo_arquivo: 'dominio_simples',
-        receita_bruta_periodo: parsed.receita_bruta_periodo || 0,
+        receita_bruta_periodo: receita,
         receita_bruta_acumulada_12m: parsed.receita_bruta_acumulada_12m || 0,
         receita_bruta_ano_corrente: parsed.receita_bruta_ano_corrente || 0,
         receita_bruta_ano_anterior: parsed.receita_bruta_ano_anterior || 0,
@@ -141,8 +112,8 @@ export default function UploadSimples() {
         total_saidas_sem_st: parsed.total_saidas_sem_st || 0,
         total_saidas_st: parsed.total_saidas_st || 0,
         total_servicos: parsed.total_servicos || 0,
-        simples_nacional_total: parsed.simples_nacional_total || 0,
-        aliquota_efetiva: parsed.aliquota_efetiva || 0,
+        simples_nacional_total: simples,
+        aliquota_efetiva: receita > 0 ? (simples / receita) * 100 : 0,
         valor_irpj: parsed.valor_irpj || 0,
         valor_csll: parsed.valor_csll || 0,
         valor_cofins: parsed.valor_cofins || 0,
@@ -156,10 +127,10 @@ export default function UploadSimples() {
         historico_12m: parsed.historico_12m || [],
       };
 
-      // Check for duplicate
+      // Verificar duplicata
       const existentes = await base44.entities.Apuracao.filter({
         empresa_id: empresaId,
-        periodo: periodo,
+        periodo: parsed.periodo,
       });
 
       if (existentes.length > 0) {
@@ -181,7 +152,6 @@ export default function UploadSimples() {
     if (!pendingData) return;
     setProcessing(true);
     setConfirmReplace(false);
-    // Delete existing and create new
     base44.entities.Apuracao.delete(pendingData.id)
       .then(() => createMutation.mutate(pendingData))
       .catch((err) => {
@@ -195,26 +165,19 @@ export default function UploadSimples() {
     setPendingData(null);
   };
 
-  const readXLSX = (file) => {
-    return new Promise((resolve, reject) => {
+  const readFileAsArray = (file) =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => resolve(new Uint8Array(e.target.result));
       reader.onerror = reject;
       reader.readAsArrayBuffer(file);
     });
-  };
-
-  const handleFileDrop = (setter) => (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer?.files?.[0];
-    if (file) setter(file);
-  };
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Upload de Relatórios</h1>
-        <p className="text-muted-foreground text-sm mt-1">Simples Nacional — Processamento de arquivos do Domínio</p>
+        <p className="text-muted-foreground text-sm mt-1">Simples Nacional — Processamento do PGDAS-D</p>
       </div>
 
       <Card>
@@ -231,9 +194,7 @@ export default function UploadSimples() {
               </SelectTrigger>
               <SelectContent>
                 {empresas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nome}
-                  </SelectItem>
+                  <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -248,71 +209,23 @@ export default function UploadSimples() {
             )}
           </div>
 
-          {/* Mês de Referência */}
+          {/* Arquivo PGDAS-D */}
           <div className="space-y-2">
             <Label>
-              Mês de Referência <span className="text-destructive">*</span>
-            </Label>
-            <div className="flex gap-3">
-              <Select value={periodoMes} onValueChange={setPeriodoMes}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    { value: '01', label: 'Janeiro' },
-                    { value: '02', label: 'Fevereiro' },
-                    { value: '03', label: 'Março' },
-                    { value: '04', label: 'Abril' },
-                    { value: '05', label: 'Maio' },
-                    { value: '06', label: 'Junho' },
-                    { value: '07', label: 'Julho' },
-                    { value: '08', label: 'Agosto' },
-                    { value: '09', label: 'Setembro' },
-                    { value: '10', label: 'Outubro' },
-                    { value: '11', label: 'Novembro' },
-                    { value: '12', label: 'Dezembro' },
-                  ].map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={periodoAno} onValueChange={setPeriodoAno}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Ano" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 10 }, (_, i) => {
-                    const ano = new Date().getFullYear() - 3 + i;
-                    return (
-                      <SelectItem key={ano} value={String(ano)}>{ano}</SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Arquivo Simples Nacional */}
-          <div className="space-y-2">
-            <Label>
-              Relatório Domínio — Simples Nacional{' '}
-              <span className="text-destructive">*</span>
+              Declaração PGDAS-D <span className="text-destructive">*</span>
             </Label>
             <FileDropZone
               file={simplesFile}
               setFile={setSimplesFile}
-              accept=".xlsx"
-              label="Relatório Simples Nacional (.xlsx)"
+              accept=".pdf"
+              label="Arquivo PGDAS-D (.pdf)"
             />
           </div>
 
-          {/* Arquivo Entradas (condicional) */}
+          {/* Arquivo Entradas (opcional, apenas para comércio) */}
           {empresa && empresa.tipo_empresa !== 'somente_servico' && (
             <div className="space-y-2">
-              <Label>
-                Relatório Domínio — Entradas por CFOP (opcional)
-              </Label>
+              <Label>Relatório Domínio — Entradas por CFOP (opcional)</Label>
               <FileDropZone
                 file={entradasFile}
                 setFile={setEntradasFile}
@@ -322,7 +235,7 @@ export default function UploadSimples() {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Alertas */}
           {confirmReplace && (
             <Alert>
               <AlertCircle className="w-4 h-4" />
@@ -364,13 +277,9 @@ export default function UploadSimples() {
             size="lg"
           >
             {processing ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" /> Processando...
-              </>
+              <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
             ) : (
-              <>
-                <FileSpreadsheet className="w-5 h-5" /> Processar Relatórios
-              </>
+              <><FileText className="w-5 h-5" /> Processar PGDAS-D</>
             )}
           </Button>
         </CardContent>
@@ -381,11 +290,6 @@ export default function UploadSimples() {
 
 function FileDropZone({ file, setFile, accept, label }) {
   const [dragOver, setDragOver] = useState(false);
-
-  const handleFile = (e) => {
-    const f = e.target.files?.[0];
-    if (f) setFile(f);
-  };
 
   return (
     <label
@@ -407,20 +311,16 @@ function FileDropZone({ file, setFile, accept, label }) {
         <>
           <CheckCircle2 className="w-8 h-8 text-green-600" />
           <span className="text-sm font-medium text-green-700">{file.name}</span>
-          <span className="text-xs text-muted-foreground">
-            {(file.size / 1024).toFixed(0)} KB — Clique para trocar
-          </span>
+          <span className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB — Clique para trocar</span>
         </>
       ) : (
         <>
           <Upload className="w-8 h-8 text-muted-foreground/50" />
           <span className="text-sm font-medium text-muted-foreground">{label}</span>
-          <span className="text-xs text-muted-foreground">
-            Arraste o arquivo ou clique para selecionar
-          </span>
+          <span className="text-xs text-muted-foreground">Arraste o arquivo ou clique para selecionar</span>
         </>
       )}
-      <input type="file" accept={accept} onChange={handleFile} className="hidden" />
+      <input type="file" accept={accept} onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }} className="hidden" />
     </label>
   );
 }
