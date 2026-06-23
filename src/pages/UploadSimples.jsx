@@ -16,7 +16,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { parsePGDAS } from '@/lib/parsers/parserPGDAS';
+import { parse as parseSomenteServico } from '@/lib/parsers/parserSomenteServico';
+import { parse as parseEntradasSaidas } from '@/lib/parsers/parserEntradasSaidas';
+import { parse as parseEntradasSaidasServicos } from '@/lib/parsers/parserEntradasSaidasServicos';
+import { parsePGDAS, classifyFaixa } from '@/lib/parsers/parserPGDAS';
 import { parseEntradas } from '@/lib/parsers/utils';
 
 const tipoLabels = {
@@ -48,7 +51,7 @@ export default function UploadSimples() {
     mutationFn: (data) => base44.entities.Apuracao.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
-      setResult({ success: true, message: 'Declaração processada com sucesso!' });
+      setResult({ success: true, message: 'Relatório processado com sucesso!' });
       setProcessing(false);
       setConfirmReplace(false);
       setPendingData(null);
@@ -66,13 +69,61 @@ export default function UploadSimples() {
     setConfirmReplace(false);
 
     if (!empresaId) { setError('Selecione uma empresa.'); return; }
-    if (!simplesFile) { setError('O arquivo PGDAS-D é obrigatório.'); return; }
+    if (!simplesFile) { setError('O arquivo do Simples Nacional é obrigatório.'); return; }
 
     setProcessing(true);
 
     try {
-      // Parse PDF PGDAS-D via AI
-      const parsed = await parsePGDAS(simplesFile);
+      const isPDF = simplesFile.name.toLowerCase().endsWith('.pdf');
+      const isXLSX = simplesFile.name.toLowerCase().endsWith('.xlsx');
+
+      let parsed;
+
+      if (isXLSX) {
+        // ---- Fluxo Excel (original) ----
+        const simplesData = await readFileAsArray(simplesFile);
+        const simplesWorkbook = XLSX.read(simplesData, { type: 'array' });
+
+        let entradasWorkbook = null;
+        if (entradasFile) {
+          const entradasData = await readFileAsArray(entradasFile);
+          entradasWorkbook = XLSX.read(entradasData, { type: 'array' });
+        }
+
+        if (empresa.tipo_empresa === 'somente_servico') {
+          parsed = parseSomenteServico(simplesWorkbook);
+        } else if (empresa.tipo_empresa === 'entradas_saidas') {
+          parsed = parseEntradasSaidas(simplesWorkbook, entradasWorkbook);
+        } else {
+          parsed = parseEntradasSaidasServicos(simplesWorkbook, entradasWorkbook);
+        }
+
+        // O parser Excel já calculou aliquota_efetiva e faixa_enquadramento
+        // Faixa também pode ser classificada via RBT12 como fallback
+        if (!parsed.faixa_enquadramento) {
+          parsed.faixa_enquadramento = classifyFaixa(parsed.receita_bruta_acumulada_12m);
+        }
+      } else if (isPDF) {
+        // ---- Fluxo PDF PGDAS-D ----
+        parsed = await parsePGDAS(simplesFile);
+
+        // Mesclar entradas do XLSX
+        if (entradasFile) {
+          const entradasData = await readFileAsArray(entradasFile);
+          const workbook = XLSX.read(entradasData, { type: 'array' });
+          const entradas = parseEntradas(workbook);
+          parsed.total_entradas = entradas.total_entradas || 0;
+          parsed.base_calculo_icms_entradas = entradas.base_calculo_icms_entradas || 0;
+          parsed.valor_icms_entradas = entradas.valor_icms_entradas || 0;
+        }
+
+        // Calcular aliquota_efetiva para PDF
+        if (parsed.receita_bruta_periodo > 0 && parsed.simples_nacional_total > 0) {
+          parsed.aliquota_efetiva = (parsed.simples_nacional_total / parsed.receita_bruta_periodo) * 100;
+        }
+      } else {
+        throw new Error('Formato de arquivo não suportado. Use .xlsx ou .pdf.');
+      }
 
       if (!parsed.periodo) {
         throw new Error('Não foi possível identificar o período no documento.');
@@ -84,16 +135,6 @@ export default function UploadSimples() {
         setCnpjWarning(
           `O CNPJ do relatório (${parsed._cnpj}) não confere com o CNPJ da empresa (${cnpjEmpresa}).`
         );
-      }
-
-      // Parse entradas XLSX (opcional)
-      if (entradasFile) {
-        const entradasData = await readFileAsArray(entradasFile);
-        const workbook = XLSX.read(entradasData, { type: 'array' });
-        const entradas = parseEntradas(workbook);
-        parsed.total_entradas = entradas.total_entradas || 0;
-        parsed.base_calculo_icms_entradas = entradas.base_calculo_icms_entradas || 0;
-        parsed.valor_icms_entradas = entradas.valor_icms_entradas || 0;
       }
 
       const receita = parsed.receita_bruta_periodo || 0;
@@ -113,7 +154,7 @@ export default function UploadSimples() {
         total_saidas_st: parsed.total_saidas_st || 0,
         total_servicos: parsed.total_servicos || 0,
         simples_nacional_total: simples,
-        aliquota_efetiva: receita > 0 ? (simples / receita) * 100 : 0,
+        aliquota_efetiva: parsed.aliquota_efetiva || (receita > 0 ? (simples / receita) * 100 : 0),
         valor_irpj: parsed.valor_irpj || 0,
         valor_csll: parsed.valor_csll || 0,
         valor_cofins: parsed.valor_cofins || 0,
@@ -173,11 +214,13 @@ export default function UploadSimples() {
       reader.readAsArrayBuffer(file);
     });
 
+  const isEntradasRelevante = empresa && empresa.tipo_empresa !== 'somente_servico';
+
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Upload de Relatórios</h1>
-        <p className="text-muted-foreground text-sm mt-1">Simples Nacional — Processamento do PGDAS-D</p>
+        <p className="text-muted-foreground text-sm mt-1">Simples Nacional — Processamento de arquivos do Domínio e PGDAS-D</p>
       </div>
 
       <Card>
@@ -209,23 +252,29 @@ export default function UploadSimples() {
             )}
           </div>
 
-          {/* Arquivo PGDAS-D */}
+          {/* Arquivo Simples Nacional (XLSX ou PDF) */}
           <div className="space-y-2">
             <Label>
-              Declaração PGDAS-D <span className="text-destructive">*</span>
+              Relatório Simples Nacional <span className="text-destructive">*</span>
             </Label>
             <FileDropZone
               file={simplesFile}
               setFile={setSimplesFile}
-              accept=".pdf"
-              label="Arquivo PGDAS-D (.pdf)"
+              accept=".xlsx,.pdf"
+              label="Relatório Simples Nacional (.xlsx ou .pdf)"
             />
+            <p className="text-xs text-muted-foreground">
+              Aceita relatórios Excel do Domínio (.xlsx) ou declaração PGDAS-D (.pdf)
+            </p>
           </div>
 
-          {/* Arquivo Entradas (opcional, apenas para comércio) */}
-          {empresa && empresa.tipo_empresa !== 'somente_servico' && (
+          {/* Arquivo Entradas */}
+          {isEntradasRelevante && (
             <div className="space-y-2">
-              <Label>Relatório Domínio — Entradas por CFOP (opcional)</Label>
+              <Label>
+                Relatório Domínio — Entradas por CFOP{' '}
+                <span className="text-xs font-normal text-muted-foreground">(necessário para dados de compras)</span>
+              </Label>
               <FileDropZone
                 file={entradasFile}
                 setFile={setEntradasFile}
@@ -279,7 +328,7 @@ export default function UploadSimples() {
             {processing ? (
               <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
             ) : (
-              <><FileText className="w-5 h-5" /> Processar PGDAS-D</>
+              <><FileText className="w-5 h-5" /> Processar Relatório</>
             )}
           </Button>
         </CardContent>
