@@ -159,24 +159,28 @@ export function extractFaixaFator(sheet) {
   }
 
   if (faixaRow >= 0) {
-    // A faixa correta está na mesma linha do rótulo (célula própria ou adjacente)
-    // ou na linha imediatamente abaixo. Nunca expande para colunas distantes
-    // pois a tabela de referência com todas as faixas fica muito à direita.
+    // Coleta TODAS as ocorrências de faixa na linha do rótulo e na linha seguinte,
+    // depois escolhe a de MAIOR valor inicial — a tabela de referência começa em "0,00 a..."
+    // enquanto a faixa real da empresa tem valores maiores (ex: "720.000,01 a 1.800.000,00").
     const faixaPattern = /[\d.]+,\d+\s+a\s+[\d.]+,\d+/;
-    // Varre a linha do rótulo + 1 linha abaixo; máximo 3 colunas à direita
+    const candidatos = [];
     for (let r = faixaRow; r <= Math.min(faixaRow + 1, range.e.r); r++) {
-      const startCol = r === faixaRow ? faixaLabelCol : 0;
-      for (let c = startCol; c <= Math.min(startCol + 3, range.e.c); c++) {
+      for (let c = 0; c <= range.e.c; c++) {
         const val = extractCellValue(sheet, r, c);
         if (val) {
           const match = String(val).match(faixaPattern);
           if (match) {
-            result.faixa_enquadramento = match[0];
-            break;
+            // Extrai o valor inicial da faixa para comparar qual é o maior
+            const valorInicial = parseFloat(match[0].split(' a ')[0].replace(/\./g, '').replace(',', '.'));
+            candidatos.push({ texto: match[0], valorInicial: isNaN(valorInicial) ? 0 : valorInicial });
           }
         }
       }
-      if (result.faixa_enquadramento) break;
+    }
+    if (candidatos.length > 0) {
+      // Escolhe a faixa com maior valor inicial (a tabela de referência começa em 0,00)
+      candidatos.sort((a, b) => b.valorInicial - a.valorInicial);
+      result.faixa_enquadramento = candidatos[0].texto;
     }
   }
 
