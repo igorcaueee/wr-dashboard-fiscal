@@ -14,7 +14,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Pencil } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Building2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { formatCNPJ, formatDateBR } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +52,8 @@ export default function Empresas() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState(initialForm);
 
   const { data: empresas = [], isLoading } = useQuery({
@@ -58,11 +70,58 @@ export default function Empresas() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Empresa.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['empresas'] });
+      setDialogOpen(false);
+      setEditingId(null);
+      setForm(initialForm);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Empresa.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['empresas'] });
+      queryClient.invalidateQueries({ queryKey: ['apuracoes'] });
+      setDeleteTarget(null);
+    },
+  });
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.nome || !form.cnpj) return;
-    createMutation.mutate(form);
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data: form });
+    } else {
+      createMutation.mutate(form);
+    }
   };
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(initialForm);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (emp) => {
+    setEditingId(emp.id);
+    setForm({
+      nome: emp.nome || '',
+      cnpj: emp.cnpj || '',
+      inicio_atividades: emp.inicio_atividades || '',
+      tipo_empresa: emp.tipo_empresa || 'somente_servico',
+      regime_tributario: emp.regime_tributario || 'simples_nacional',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   const handleCNPJChange = (e) => {
     let value = e.target.value.replace(/\D/g, '').slice(0, 14);
@@ -83,7 +142,7 @@ export default function Empresas() {
             Gerencie as empresas cadastradas no sistema
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="gap-2 bg-primary hover:bg-primary/90">
+        <Button onClick={openCreate} className="gap-2 bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4" /> Nova Empresa
         </Button>
       </div>
@@ -110,7 +169,7 @@ export default function Empresas() {
             <p className="text-sm text-muted-foreground/70 mb-4">
               Cadastre a primeira empresa para começar
             </p>
-            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <Button onClick={openCreate} className="gap-2">
               <Plus className="w-4 h-4" /> Cadastrar primeira empresa
             </Button>
           </CardContent>
@@ -120,11 +179,13 @@ export default function Empresas() {
           {empresas.map((emp) => (
             <Card
               key={emp.id}
-              className="hover:shadow-md transition-all duration-200 cursor-pointer group"
-              onClick={() => navigate('/')}
+              className="hover:shadow-md transition-all duration-200 group"
             >
               <CardContent className="p-5 flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div
+                  className="flex items-center gap-4 flex-1 cursor-pointer"
+                  onClick={() => navigate('/')}
+                >
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Building2 className="w-5 h-5 text-primary" />
                   </div>
@@ -143,7 +204,24 @@ export default function Empresas() {
                     {tipoLabels[emp.tipo_empresa] || emp.tipo_empresa}
                   </Badge>
                   <Badge variant="secondary">Simples Nacional</Badge>
-                  <Pencil className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={(e) => { e.stopPropagation(); openEdit(emp); }}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(emp); }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -155,7 +233,9 @@ export default function Empresas() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-xl">Nova Empresa</DialogTitle>
+            <DialogTitle className="text-xl">
+              {editingId ? 'Editar Empresa' : 'Nova Empresa'}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-5 mt-4">
             <div className="space-y-2">
@@ -240,13 +320,36 @@ export default function Empresas() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMutation.isPending} className="gap-2">
-                {createMutation.isPending ? 'Salvando...' : 'Salvar Empresa'}
+              <Button type="submit" disabled={isPending} className="gap-2">
+                {isPending ? 'Salvando...' : editingId ? 'Atualizar Empresa' : 'Salvar Empresa'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmação de Exclusão */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir empresa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deleteTarget?.nome}</strong>?
+              Esta ação não pode ser desfeita e também removerá as apurações vinculadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
