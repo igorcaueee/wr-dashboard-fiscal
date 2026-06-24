@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Loader2,
   Info,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -343,7 +344,7 @@ function FileDropZone({ file, setFile, accept, label }) {
   return (
     <label
       className={cn(
-        'flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200',
+        'relative flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200',
         dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/50',
         file && 'border-green-300 bg-green-50'
       )}
@@ -358,6 +359,14 @@ function FileDropZone({ file, setFile, accept, label }) {
     >
       {file ? (
         <>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFile(null); }}
+            className="absolute top-2 right-2 p-1 rounded-full bg-white/80 hover:bg-white text-muted-foreground hover:text-destructive transition-colors"
+            aria-label="Remover arquivo"
+          >
+            <X className="w-4 h-4" />
+          </button>
           <CheckCircle2 className="w-8 h-8 text-green-600" />
           <span className="text-sm font-medium text-green-700">{file.name}</span>
           <span className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB — Clique para trocar</span>
