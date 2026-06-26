@@ -33,7 +33,7 @@ export default function UploadSimples() {
   const queryClient = useQueryClient();
   const [empresaId, setEmpresaId] = useState('');
   const [simplesFile, setSimplesFile] = useState(null);
-  const [entradasFile, setEntradasFile] = useState(null);
+  const [entradasFiles, setEntradasFiles] = useState([]);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -80,23 +80,40 @@ export default function UploadSimples() {
 
       let parsed;
 
+      // Processar e somar múltiplos arquivos de entradas (filiais)
+      const entradasMerge = { total_entradas: 0, base_calculo_icms_entradas: 0, valor_icms_entradas: 0 };
+      if (entradasFiles.length > 0) {
+        for (const file of entradasFiles) {
+          const data = await readFileAsArray(file);
+          const wb = XLSX.read(data, { type: 'array' });
+          const e = parseEntradas(wb);
+          entradasMerge.total_entradas += e.total_entradas || 0;
+          entradasMerge.base_calculo_icms_entradas += e.base_calculo_icms_entradas || 0;
+          entradasMerge.valor_icms_entradas += e.valor_icms_entradas || 0;
+        }
+        entradasMerge.total_entradas = Math.round(entradasMerge.total_entradas * 100) / 100;
+        entradasMerge.base_calculo_icms_entradas = Math.round(entradasMerge.base_calculo_icms_entradas * 100) / 100;
+        entradasMerge.valor_icms_entradas = Math.round(entradasMerge.valor_icms_entradas * 100) / 100;
+      }
+
       if (isXLSX) {
         // ---- Fluxo Excel (original) ----
         const simplesData = await readFileAsArray(simplesFile);
         const simplesWorkbook = XLSX.read(simplesData, { type: 'array' });
 
-        let entradasWorkbook = null;
-        if (entradasFile) {
-          const entradasData = await readFileAsArray(entradasFile);
-          entradasWorkbook = XLSX.read(entradasData, { type: 'array' });
-        }
-
         if (empresa.tipo_empresa === 'somente_servico') {
           parsed = parseSomenteServico(simplesWorkbook);
         } else if (empresa.tipo_empresa === 'entradas_saidas') {
-          parsed = parseEntradasSaidas(simplesWorkbook, entradasWorkbook);
+          parsed = parseEntradasSaidas(simplesWorkbook, null);
         } else {
-          parsed = parseEntradasSaidasServicos(simplesWorkbook, entradasWorkbook);
+          parsed = parseEntradasSaidasServicos(simplesWorkbook, null);
+        }
+
+        // Mesclar entradas somadas (matriz + filiais)
+        if (entradasFiles.length > 0) {
+          parsed.total_entradas = entradasMerge.total_entradas;
+          parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
+          parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
         }
 
         // O parser Excel já calculou aliquota_efetiva e faixa_enquadramento
@@ -108,14 +125,11 @@ export default function UploadSimples() {
         // ---- Fluxo PDF PGDAS-D ----
         parsed = await parsePGDAS(simplesFile);
 
-        // Mesclar entradas do XLSX
-        if (entradasFile) {
-          const entradasData = await readFileAsArray(entradasFile);
-          const workbook = XLSX.read(entradasData, { type: 'array' });
-          const entradas = parseEntradas(workbook);
-          parsed.total_entradas = entradas.total_entradas || 0;
-          parsed.base_calculo_icms_entradas = entradas.base_calculo_icms_entradas || 0;
-          parsed.valor_icms_entradas = entradas.valor_icms_entradas || 0;
+        // Mesclar entradas somadas (matriz + filiais)
+        if (entradasFiles.length > 0) {
+          parsed.total_entradas = entradasMerge.total_entradas;
+          parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
+          parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
         }
 
         // Calcular aliquota_efetiva para PDF
@@ -269,19 +283,26 @@ export default function UploadSimples() {
             </p>
           </div>
 
-          {/* Arquivo Entradas */}
+          {/* Arquivo Entradas (múltiplos — matriz + filiais) */}
           {isEntradasRelevante && (
             <div className="space-y-2">
               <Label>
                 Relatório Domínio — Entradas por CFOP{' '}
-                <span className="text-xs font-normal text-muted-foreground">(necessário para dados de compras)</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  (necessário para dados de compras — adicione um arquivo por estabelecimento)
+                </span>
               </Label>
-              <FileDropZone
-                file={entradasFile}
-                setFile={setEntradasFile}
+              <MultiFileDropZone
+                files={entradasFiles}
+                setFiles={setEntradasFiles}
                 accept=".xlsx"
                 label="Relatório de Entradas por CFOP (.xlsx)"
               />
+              {entradasFiles.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {entradasFiles.length} arquivos selecionados — os valores serão somados (matriz + filiais)
+                </p>
+              )}
             </div>
           )}
 
@@ -380,5 +401,78 @@ function FileDropZone({ file, setFile, accept, label }) {
       )}
       <input type="file" accept={accept} onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }} className="hidden" />
     </label>
+  );
+}
+
+function MultiFileDropZone({ files, setFiles, accept, label }) {
+  const [dragOver, setDragOver] = useState(false);
+
+  const addFiles = (newFiles) => {
+    const arr = Array.from(newFiles);
+    // Evitar duplicatas por nome + tamanho
+    const existing = new Set(files.map((f) => `${f.name}_${f.size}`));
+    const unique = arr.filter((f) => !existing.has(`${f.name}_${f.size}`));
+    if (unique.length > 0) setFiles([...files, ...unique]);
+  };
+
+  const removeFile = (idx) => {
+    setFiles(files.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-2">
+      <label
+        className={cn(
+          'relative flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200',
+          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-muted/50',
+          files.length > 0 && 'border-green-300 bg-green-50'
+        )}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+        }}
+      >
+        <Upload className="w-8 h-8 text-muted-foreground/50" />
+        <span className="text-sm font-medium text-muted-foreground">{label}</span>
+        <span className="text-xs text-muted-foreground">
+          Arraste os arquivos ou clique para selecionar (um por estabelecimento)
+        </span>
+        <input
+          type="file"
+          accept={accept}
+          multiple
+          onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = ''; }}
+          className="hidden"
+        />
+      </label>
+
+      {files.length > 0 && (
+        <div className="space-y-1.5">
+          {files.map((file, idx) => (
+            <div
+              key={`${file.name}_${file.size}`}
+              className="flex items-center gap-3 p-2.5 rounded-lg bg-green-50 border border-green-200"
+            >
+              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-medium text-green-700 truncate block">{file.name}</span>
+                <span className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFile(idx)}
+                className="p-1 rounded-full hover:bg-white text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                aria-label="Remover arquivo"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
