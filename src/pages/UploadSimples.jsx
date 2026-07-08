@@ -34,6 +34,8 @@ export default function UploadSimples() {
   const [empresaId, setEmpresaId] = useState('');
   const [simplesFile, setSimplesFile] = useState(null);
   const [entradasFiles, setEntradasFiles] = useState([]);
+  const [periodoMes, setPeriodoMes] = useState('');
+  const [periodoAno, setPeriodoAno] = useState('');
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -70,14 +72,18 @@ export default function UploadSimples() {
     setConfirmReplace(false);
 
     if (!empresaId) { setError('Selecione uma empresa.'); return; }
-    if (!simplesFile) { setError('O arquivo do Simples Nacional é obrigatório.'); return; }
+    if (!simplesFile && entradasFiles.length === 0) {
+      setError('Anexe pelo menos um arquivo (Simples Nacional ou Entradas).');
+      return;
+    }
+    if (!simplesFile && (!periodoMes || !periodoAno)) {
+      setError('Selecione o período (mês/ano) ou anexe o Relatório Simples Nacional.');
+      return;
+    }
 
     setProcessing(true);
 
     try {
-      const isPDF = simplesFile.name.toLowerCase().endsWith('.pdf');
-      const isXLSX = simplesFile.name.toLowerCase().endsWith('.xlsx');
-
       let parsed;
 
       // Processar e somar múltiplos arquivos de entradas (filiais)
@@ -96,48 +102,61 @@ export default function UploadSimples() {
         entradasMerge.valor_icms_entradas = Math.round(entradasMerge.valor_icms_entradas * 100) / 100;
       }
 
-      if (isXLSX) {
-        // ---- Fluxo Excel (original) ----
-        const simplesData = await readFileAsArray(simplesFile);
-        const simplesWorkbook = XLSX.read(simplesData, { type: 'array' });
-
-        if (empresa.tipo_empresa === 'somente_servico') {
-          parsed = parseSomenteServico(simplesWorkbook);
-        } else if (empresa.tipo_empresa === 'entradas_saidas') {
-          parsed = parseEntradasSaidas(simplesWorkbook, null);
-        } else {
-          parsed = parseEntradasSaidasServicos(simplesWorkbook, null);
-        }
-
-        // Mesclar entradas somadas (matriz + filiais)
-        if (entradasFiles.length > 0) {
-          parsed.total_entradas = entradasMerge.total_entradas;
-          parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
-          parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
-        }
-
-        // O parser Excel já calculou aliquota_efetiva e faixa_enquadramento
-        // Faixa também pode ser classificada via RBT12 como fallback
-        if (!parsed.faixa_enquadramento) {
-          parsed.faixa_enquadramento = classifyFaixa(parsed.receita_bruta_acumulada_12m);
-        }
-      } else if (isPDF) {
-        // ---- Fluxo PDF PGDAS-D ----
-        parsed = await parsePGDAS(simplesFile);
-
-        // Mesclar entradas somadas (matriz + filiais)
-        if (entradasFiles.length > 0) {
-          parsed.total_entradas = entradasMerge.total_entradas;
-          parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
-          parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
-        }
-
-        // Calcular aliquota_efetiva para PDF
-        if (parsed.receita_bruta_periodo > 0 && parsed.simples_nacional_total > 0) {
-          parsed.aliquota_efetiva = (parsed.simples_nacional_total / parsed.receita_bruta_periodo) * 100;
-        }
+      // --- Fluxo sem Simples Nacional (somente Entradas) ---
+      if (!simplesFile) {
+        parsed = {
+          periodo: `${periodoMes}/${periodoAno}`,
+          total_entradas: entradasMerge.total_entradas,
+          base_calculo_icms_entradas: entradasMerge.base_calculo_icms_entradas,
+          valor_icms_entradas: entradasMerge.valor_icms_entradas,
+        };
       } else {
-        throw new Error('Formato de arquivo não suportado. Use .xlsx ou .pdf.');
+        const isPDF = simplesFile.name.toLowerCase().endsWith('.pdf');
+        const isXLSX = simplesFile.name.toLowerCase().endsWith('.xlsx');
+
+        if (isXLSX) {
+          // ---- Fluxo Excel (original) ----
+          const simplesData = await readFileAsArray(simplesFile);
+          const simplesWorkbook = XLSX.read(simplesData, { type: 'array' });
+
+          if (empresa.tipo_empresa === 'somente_servico') {
+            parsed = parseSomenteServico(simplesWorkbook);
+          } else if (empresa.tipo_empresa === 'entradas_saidas') {
+            parsed = parseEntradasSaidas(simplesWorkbook, null);
+          } else {
+            parsed = parseEntradasSaidasServicos(simplesWorkbook, null);
+          }
+
+          // Mesclar entradas somadas (matriz + filiais)
+          if (entradasFiles.length > 0) {
+            parsed.total_entradas = entradasMerge.total_entradas;
+            parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
+            parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
+          }
+
+          // O parser Excel já calculou aliquota_efetiva e faixa_enquadramento
+          // Faixa também pode ser classificada via RBT12 como fallback
+          if (!parsed.faixa_enquadramento) {
+            parsed.faixa_enquadramento = classifyFaixa(parsed.receita_bruta_acumulada_12m);
+          }
+        } else if (isPDF) {
+          // ---- Fluxo PDF PGDAS-D ----
+          parsed = await parsePGDAS(simplesFile);
+
+          // Mesclar entradas somadas (matriz + filiais)
+          if (entradasFiles.length > 0) {
+            parsed.total_entradas = entradasMerge.total_entradas;
+            parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
+            parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
+          }
+
+          // Calcular aliquota_efetiva para PDF
+          if (parsed.receita_bruta_periodo > 0 && parsed.simples_nacional_total > 0) {
+            parsed.aliquota_efetiva = (parsed.simples_nacional_total / parsed.receita_bruta_periodo) * 100;
+          }
+        } else {
+          throw new Error('Formato de arquivo não suportado. Use .xlsx ou .pdf.');
+        }
       }
 
       if (!parsed.periodo) {
@@ -267,11 +286,9 @@ export default function UploadSimples() {
             )}
           </div>
 
-          {/* Arquivo Simples Nacional (XLSX ou PDF) */}
+          {/* Arquivo Simples Nacional (XLSX ou PDF) — opcional */}
           <div className="space-y-2">
-            <Label>
-              Relatório Simples Nacional <span className="text-destructive">*</span>
-            </Label>
+            <Label>Relatório Simples Nacional</Label>
             <FileDropZone
               file={simplesFile}
               setFile={setSimplesFile}
@@ -282,6 +299,36 @@ export default function UploadSimples() {
               Aceita relatórios Excel do Domínio (.xlsx) ou declaração PGDAS-D (.pdf)
             </p>
           </div>
+
+          {/* Seletor de período manual (quando não há Simples Nacional) */}
+          {!simplesFile && (
+            <div className="space-y-2">
+              <Label>
+                Período da apuração <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex gap-3">
+                <Select value={periodoMes} onValueChange={setPeriodoMes}>
+                  <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+                  <SelectContent>
+                    {['01','02','03','04','05','06','07','08','09','10','11','12'].map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={periodoAno} onValueChange={setPeriodoAno}>
+                  <SelectTrigger><SelectValue placeholder="Ano" /></SelectTrigger>
+                  <SelectContent>
+                    {['2024','2025','2026'].map((y) => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Informe o período manualmente quando enviar apenas o relatório de Entradas
+              </p>
+            </div>
+          )}
 
           {/* Arquivo Entradas (múltiplos — matriz + filiais) */}
           {isEntradasRelevante && (
