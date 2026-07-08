@@ -83,3 +83,21 @@ export async function parsePGDAS(file) {
 
   return extracted;
 }
+
+// Preview leve do período de apuração (PDF) — apenas upload + prompt mínimo
+export async function extractPeriodPreview(file) {
+  const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+  const extracted = await base44.integrations.Core.InvokeLLM({
+    prompt: `Extraia apenas o período de apuração deste documento PGDAS-D. Retorne no formato MM/YYYY (ex: "05/2026"). Baseie-se no campo "Período de Apuração" (ex: "01/05/2026 a 31/05/2026" → "05/2026").`,
+    file_urls: [file_url],
+    response_json_schema: {
+      type: 'object',
+      properties: {
+        periodo: { type: 'string' }
+      }
+    }
+  });
+
+  return extracted.periodo || null;
+}

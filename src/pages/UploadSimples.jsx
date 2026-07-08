@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,8 +20,8 @@ import * as XLSX from 'xlsx';
 import { parse as parseSomenteServico } from '@/lib/parsers/parserSomenteServico';
 import { parse as parseEntradasSaidas } from '@/lib/parsers/parserEntradasSaidas';
 import { parse as parseEntradasSaidasServicos } from '@/lib/parsers/parserEntradasSaidasServicos';
-import { parsePGDAS, classifyFaixa } from '@/lib/parsers/parserPGDAS';
-import { parseEntradas } from '@/lib/parsers/utils';
+import { parsePGDAS, classifyFaixa, extractPeriodPreview } from '@/lib/parsers/parserPGDAS';
+import { parseEntradas, extractHeaderInfo } from '@/lib/parsers/utils';
 
 const tipoLabels = {
   somente_servico: 'Somente Prestação de Serviços',
@@ -40,6 +40,55 @@ export default function UploadSimples() {
   const [cnpjWarning, setCnpjWarning] = useState(null);
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [pendingData, setPendingData] = useState(null);
+  const [periodoPreview, setPeriodoPreview] = useState(null);
+  const [periodoLoading, setPeriodoLoading] = useState(false);
+  const [periodoError, setPeriodoError] = useState(null);
+
+  // Extrair período de apuração em tempo real ao selecionar o arquivo Simples
+  useEffect(() => {
+    if (!simplesFile) {
+      setPeriodoPreview(null);
+      setPeriodoLoading(false);
+      setPeriodoError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPeriodoLoading(true);
+    setPeriodoPreview(null);
+    setPeriodoError(null);
+
+    (async () => {
+      try {
+        const isPDF = simplesFile.name.toLowerCase().endsWith('.pdf');
+        let periodo = null;
+
+        if (isPDF) {
+          periodo = await extractPeriodPreview(simplesFile);
+        } else {
+          const data = await readFileAsArray(simplesFile);
+          const wb = XLSX.read(data, { type: 'array' });
+          const sheet = wb.Sheets['Simples Nacional'] || wb.Sheets[wb.SheetNames[0]];
+          if (sheet) {
+            const headerInfo = extractHeaderInfo(sheet);
+            periodo = headerInfo.periodo || null;
+          }
+        }
+
+        if (!cancelled) {
+          setPeriodoPreview(periodo);
+          setPeriodoLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPeriodoError('Não foi possível identificar o período.');
+          setPeriodoLoading(false);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [simplesFile]);
 
   const { data: empresas = [] } = useQuery({
     queryKey: ['empresas'],
@@ -281,6 +330,22 @@ export default function UploadSimples() {
             <p className="text-xs text-muted-foreground">
               Aceita relatórios Excel do Domínio (.xlsx) ou declaração PGDAS-D (.pdf)
             </p>
+            {simplesFile && periodoLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Identificando período de apuração...
+              </div>
+            )}
+            {simplesFile && !periodoLoading && periodoPreview && (
+              <div className="flex items-center gap-2 mt-1 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <FileText className="w-4 h-4 text-primary" />
+                <span className="text-sm text-muted-foreground">Período de Apuração:</span>
+                <span className="text-sm font-semibold text-primary">{periodoPreview}</span>
+              </div>
+            )}
+            {simplesFile && !periodoLoading && periodoError && (
+              <p className="text-xs text-destructive mt-1">{periodoError}</p>
+            )}
           </div>
 
           {/* Arquivo Entradas (múltiplos — matriz + filiais) */}
