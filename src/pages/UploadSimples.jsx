@@ -286,20 +286,6 @@ export default function UploadSimples() {
             )}
           </div>
 
-          {/* Arquivo Simples Nacional (XLSX ou PDF) — opcional */}
-          <div className="space-y-2">
-            <Label>Relatório Simples Nacional</Label>
-            <FileDropZone
-              file={simplesFile}
-              setFile={setSimplesFile}
-              accept=".xlsx,.pdf"
-              label="Relatório Simples Nacional (.xlsx ou .pdf)"
-            />
-            <p className="text-xs text-muted-foreground">
-              Aceita relatórios Excel do Domínio (.xlsx) ou declaração PGDAS-D (.pdf)
-            </p>
-          </div>
-
           {/* Seletor de período manual (quando não há Simples Nacional) */}
           {!simplesFile && (
             <div className="space-y-2">
@@ -329,6 +315,20 @@ export default function UploadSimples() {
               </p>
             </div>
           )}
+
+          {/* Arquivo Simples Nacional (XLSX ou PDF) — opcional */}
+          <div className="space-y-2">
+            <Label>Relatório Simples Nacional</Label>
+            <FileDropZone
+              file={simplesFile}
+              setFile={setSimplesFile}
+              accept=".xlsx,.pdf"
+              label="Relatório Simples Nacional (.xlsx ou .pdf)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Aceita relatórios Excel do Domínio (.xlsx) ou declaração PGDAS-D (.pdf)
+            </p>
+          </div>
 
           {/* Arquivo Entradas (múltiplos — matriz + filiais) */}
           {isEntradasRelevante && (
