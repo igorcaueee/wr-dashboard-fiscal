@@ -86,20 +86,22 @@ export default function UploadLucroPresumido() {
         const alertasResp = await base44.integrations.Core.InvokeLLM({
           prompt: `Você é um especialista tributário brasileiro. Analise os dados extraídos dos SPEDs de uma empresa do Lucro Presumido referente ao período ${periodo} e aponte possíveis erros, inconsistências e alertas tributários.
 
+CONTEXSO TRIBUTÁRIO IMPORTANTE:
+1. ICMS: O saldo apurado NÃO é simplesmente (Débito - Crédito). O cálculo correto é: (Débitos + Ajustes a Débito) - (Créditos + Ajustes a Crédito + Saldo Credor do Período Anterior). Portanto, quando há saldo credor do período anterior, o saldo final pode ser credor (negativo) mesmo com débitos maiores que créditos no período. NÃO flague como erro matemático a diferença entre Débito e Crédito sem considerar o saldo credor anterior.
+2. PIS e COFINS: No Lucro Presumido, o regime é CUMULATIVO — NÃO gera créditos sobre compras e despesas. O imposto é calculado diretamente sobre o faturamento (PIS 0,65% e COFINS 3,00%). Portanto, a existência apenas de débito (sem crédito) é o comportamento ESPERADO e correto. NÃO flague a ausência de créditos de PIS/COFINS como erro ou inconsistência.
+
 Dados:
 - Total de Compras: R$ ${(icmsData.total_compras || 0).toFixed(2)}
 - Total de Vendas/Faturamento: R$ ${(icmsData.total_vendas || 0).toFixed(2)}
 - ICMS Débito: R$ ${(icmsData.icms_debito || 0).toFixed(2)}
 - ICMS Crédito: R$ ${(icmsData.icms_credito || 0).toFixed(2)}
-- ICMS Saldo: R$ ${(icmsData.icms_saldo || 0).toFixed(2)}
-- PIS Débito: R$ ${(pisData.pis_debito || 0).toFixed(2)}
-- PIS Crédito: R$ ${(pisData.pis_credito || 0).toFixed(2)}
-- COFINS Débito: R$ ${(pisData.cofins_debito || 0).toFixed(2)}
-- COFINS Crédito: R$ ${(pisData.cofins_credito || 0).toFixed(2)}
+- ICMS Saldo (já considera saldo credor anterior): R$ ${(icmsData.icms_saldo || 0).toFixed(2)}
+- PIS Débito (regime cumulativo): R$ ${(pisData.pis_debito || 0).toFixed(2)}
+- COFINS Débito (regime cumulativo): R$ ${(pisData.cofins_debito || 0).toFixed(2)}
 - CFOPs de vendas: ${(icmsData.vendas_por_cfop || []).map(c => c.cfop).join(', ')}
 - CFOPs de compras: ${(icmsData.compras_por_cfop || []).map(c => c.cfop).join(', ')}
 
-Retorne até 8 alertas objetivos e práticos, classificados como "erro" (inconsistência grave), "aviso" (atenção necessária) ou "info" (informação relevante). Seja específico com os valores quando relevante.`,
+Retorne até 8 alertas objetivos e práticos, classificados como "erro" (inconsistência grave), "aviso" (atenção necessária) ou "info" (informação relevante). Seja específico com os valores quando relevante. Foque em inconsistências reais, CFOPs atípicos, relação compras/vendas, e pontos de atenção fiscal — não em validações matemáticas de saldo que já consideram o contexto do período anterior.`,
           response_json_schema: {
             type: 'object',
             properties: {
