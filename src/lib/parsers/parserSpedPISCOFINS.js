@@ -70,19 +70,10 @@ export function parseSpedPISCOFINS(text) {
       }
     }
 
-    if (reg === 'M200') {
-      // |M200|vl_tot_cont_nc_per|vl_tot_cred_desc|vl_tot_cred_desc_ant|vl_tot_cred_desc_def|vl_tot_cred_desc_ant2|vl_tot_cred_desc_ntrib|vl_tot_cred_desc_exp|vl_cont_nc_rec|...
-      result.pis_credito = parseBR(fields[9]); // vl_cont_nc_rec (crédito PIS apurado)
-    }
-
     if (reg === 'M210') {
       // |M210|cod_cont|vl_rec_brt|vl_bc_cont|vl_ajus_acres_rec|vl_ajus_red_rec|vl_bc_cont_aj|aliq_pis|quant_bc_cont|vl_cont_apur|vl_ajus_acres|vl_ajus_red|vl_cont_dif|vl_cont_ativ|vl_cont_per
       result.pis_base_debito = parseBR(fields[4]); // vl_bc_cont
       result.pis_debito = parseBR(fields[11]);     // vl_cont_apur
-    }
-
-    if (reg === 'M600') {
-      result.cofins_credito = parseBR(fields[9]);
     }
 
     if (reg === 'M610') {

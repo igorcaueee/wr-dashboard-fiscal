@@ -255,9 +255,9 @@ export default function DashboardLucroPresumido() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <MetricCard title="Compras" value={fmtBRL(apuracao.total_compras)} sub={`${apuracao.qtd_notas_compras || 0} notas`} icon={ShoppingCart} />
             <MetricCard title="Faturamento" value={fmtBRL(apuracao.total_vendas)} sub={`${apuracao.qtd_notas_vendas || 0} notas`} icon={TrendingUp} />
-            <MetricCard title="ICMS" value={fmtBRL(Math.abs(apuracao.icms_saldo))} sub={(apuracao.icms_saldo || 0) >= 0 ? 'Saldo Devedor' : 'Saldo Credor'} variant={(apuracao.icms_saldo || 0) >= 0 ? 'warning' : 'success'} />
-            <MetricCard title="PIS" value={fmtBRL(Math.abs(apuracao.pis_saldo))} sub={(apuracao.pis_saldo || 0) >= 0 ? 'Saldo Devedor' : 'Saldo Credor'} variant={(apuracao.pis_saldo || 0) >= 0 ? 'warning' : 'success'} />
-            <MetricCard title="COFINS" value={fmtBRL(Math.abs(apuracao.cofins_saldo))} sub={(apuracao.cofins_saldo || 0) >= 0 ? 'Saldo Devedor' : 'Saldo Credor'} variant={(apuracao.cofins_saldo || 0) >= 0 ? 'warning' : 'success'} />
+            <MetricCard title="ICMS" value={fmtBRL(Math.abs(apuracao.icms_saldo))} sub={(apuracao.icms_saldo || 0) >= 0 ? 'Valor a Pagar' : 'Saldo Credor'} variant={(apuracao.icms_saldo || 0) >= 0 ? 'warning' : 'success'} />
+            <MetricCard title="PIS" value={fmtBRL(Math.abs(apuracao.pis_saldo))} sub={(apuracao.pis_saldo || 0) >= 0 ? 'Valor a Pagar' : 'Saldo Credor'} variant={(apuracao.pis_saldo || 0) >= 0 ? 'warning' : 'success'} />
+            <MetricCard title="COFINS" value={fmtBRL(Math.abs(apuracao.cofins_saldo))} sub={(apuracao.cofins_saldo || 0) >= 0 ? 'Valor a Pagar' : 'Saldo Credor'} variant={(apuracao.cofins_saldo || 0) >= 0 ? 'warning' : 'success'} />
           </div>
 
           {/* Gráfico Compras x Faturamento */}
