@@ -112,15 +112,19 @@ export function parseSpedICMS(text) {
     if (reg === 'E110') {
       // |E110|vl_tot_debitos|vl_aj_debitos|vl_tot_aj_debitos|vl_estornos_cred|vl_tot_creditos|vl_aj_creditos|vl_tot_aj_creditos|vl_estornos_deb|vl_sld_credor_ant|vl_sld_apurado|vl_tot_ded|vl_icms_recolher|vl_sld_credor_transp|deb_esp
       result.icms_debito = parseBR(fields[2]);
-      result.icms_ajustes_debito = parseBR(fields[3]);
+      result.icms_ajustes_debito = parseBR(fields[4]);
       result.icms_credito = parseBR(fields[6]);
-      result.icms_ajustes_credito = parseBR(fields[7]);
-      result.icms_saldo = parseBR(fields[11]); // vl_icms_recolher ou saldo credor
-      // saldo: positivo = devedor, negativo = credor (usamos sld_apurado)
-      const sldApurado = parseBR(fields[10]);
-      const sldCredorTransp = parseBR(fields[13]);
-      // Se saldo apurado > 0 é devedor, saldo credor transportado = credor
-      result.icms_saldo = sldApurado > 0 ? sldApurado : -sldCredorTransp;
+      result.icms_ajustes_credito = parseBR(fields[8]);
+      const icmsRecolher = parseBR(fields[13]);     // vl_icms_recolher (saldo devedor a recolher)
+      const sldCredorTransp = parseBR(fields[14]);  // vl_sld_credor_transp (saldo credor a transportar)
+      // saldo: positivo = devedor (a recolher), negativo = credor (a transportar)
+      if (icmsRecolher > 0) {
+        result.icms_saldo = icmsRecolher;
+      } else if (sldCredorTransp > 0) {
+        result.icms_saldo = -sldCredorTransp;
+      } else {
+        result.icms_saldo = 0;
+      }
     }
 
     if (reg === 'E510') {
