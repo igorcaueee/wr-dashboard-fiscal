@@ -201,5 +201,10 @@ export function parseSpedICMS(text) {
     .map(([origem, valor]) => ({ origem, valor }))
     .sort((a, b) => b.valor - a.valor);
 
+  // Converter vendas_por_uf (objeto acumulador) em array ordenado
+  result.vendas_por_uf = Object.entries(result.vendas_por_uf)
+    .map(([uf, valor]) => ({ uf, valor }))
+    .sort((a, b) => b.valor - a.valor);
+
   return result;
 }
