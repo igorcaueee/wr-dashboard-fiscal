@@ -40,6 +40,16 @@ const tipoColors = {
   entradas_saidas_servicos: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
+const regimeLabels = {
+  simples_nacional: 'Simples Nacional',
+  lucro_presumido: 'Lucro Presumido',
+};
+
+const regimeColors = {
+  simples_nacional: 'bg-teal-50 text-teal-700 border-teal-200',
+  lucro_presumido: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+};
+
 const initialForm = {
   nome: '',
   cnpj: '',
@@ -203,7 +213,9 @@ export default function Empresas() {
                   <Badge className={cn('border', tipoColors[emp.tipo_empresa] || 'bg-muted')}>
                     {tipoLabels[emp.tipo_empresa] || emp.tipo_empresa}
                   </Badge>
-                  <Badge variant="secondary">Simples Nacional</Badge>
+                  <Badge className={cn('border', regimeColors[emp.regime_tributario] || 'bg-muted')}>
+                    {regimeLabels[emp.regime_tributario] || emp.regime_tributario}
+                  </Badge>
                   <div className="flex items-center gap-1">
                     <Button
                       size="icon"
@@ -305,11 +317,38 @@ export default function Empresas() {
             </div>
             <div className="space-y-2">
               <Label>Regime Tributário</Label>
-              <div className="p-3 rounded-lg border-2 border-border bg-muted/30">
-                <span className="text-sm font-medium">Simples Nacional</span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Outros regimes estarão disponíveis em breve
-                </p>
+              <div className="grid gap-2">
+                {Object.entries(regimeLabels).map(([key, label]) => (
+                  <label
+                    key={key}
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all',
+                      form.regime_tributario === key
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/30'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="regime_tributario"
+                      value={key}
+                      checked={form.regime_tributario === key}
+                      onChange={(e) => setForm({ ...form, regime_tributario: e.target.value })}
+                      className="sr-only"
+                    />
+                    <div
+                      className={cn(
+                        'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                        form.regime_tributario === key ? 'border-primary' : 'border-muted-foreground/30'
+                      )}
+                    >
+                      {form.regime_tributario === key && (
+                        <div className="w-2 h-2 rounded-full bg-primary" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium">{label}</span>
+                  </label>
+                ))}
               </div>
             </div>
             <DialogFooter>
