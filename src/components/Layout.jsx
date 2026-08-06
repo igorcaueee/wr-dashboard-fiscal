@@ -35,15 +35,22 @@ const navItems = [
       { label: 'Histórico de Apurações', path: '/simples-nacional/historico', icon: History },
     ],
   },
+  {
+    label: 'Lucro Presumido',
+    icon: FileSpreadsheet,
+    children: [
+      { label: 'Dashboard', path: '/lucro-presumido/dashboard', icon: LayoutDashboard },
+      { label: 'Upload de SPEDs', path: '/lucro-presumido/upload', icon: Upload },
+    ],
+  },
 ];
 
 const disabledItems = [
   { label: 'Lucro Real', emBreve: true },
-  { label: 'Lucro Presumido', emBreve: true },
 ];
 
 export default function Layout() {
-  const [expandedMenus, setExpandedMenus] = useState({ 'Simples Nacional': true });
+  const [expandedMenus, setExpandedMenus] = useState({ 'Simples Nacional': true, 'Lucro Presumido': true });
   const location = useLocation();
 
   const toggleMenu = (label) => {

@@ -11,6 +11,8 @@ import Dashboard from '@/pages/Dashboard';
 import Empresas from '@/pages/Empresas';
 import UploadSimples from '@/pages/UploadSimples';
 import HistoricoApuracoes from '@/pages/HistoricoApuracoes';
+import UploadLucroPresumido from '@/pages/UploadLucroPresumido';
+import DashboardLucroPresumido from '@/pages/DashboardLucroPresumido';
 // Add page imports here
 
 const AuthenticatedApp = () => {
@@ -44,6 +46,8 @@ const AuthenticatedApp = () => {
         <Route path="/empresas" element={<Empresas />} />
         <Route path="/simples-nacional/upload" element={<UploadSimples />} />
         <Route path="/simples-nacional/historico" element={<HistoricoApuracoes />} />
+        <Route path="/lucro-presumido/dashboard" element={<DashboardLucroPresumido />} />
+        <Route path="/lucro-presumido/upload" element={<UploadLucroPresumido />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
