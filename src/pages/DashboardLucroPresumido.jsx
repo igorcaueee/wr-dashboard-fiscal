@@ -34,15 +34,16 @@ function MetricCard({ title, value, sub, variant = 'default', icon: Icon }) {
   );
 }
 
-function SaldoCard({ title, debito, credito, saldo, showCredito = true }) {
+function SaldoCard({ title, debito, credito, saldo, showCredito = true, showSaldo = true }) {
   const isDevedor = saldo >= 0;
+  const cols = !showCredito && !showSaldo ? 'grid-cols-1' : showCredito && showSaldo ? 'grid-cols-3' : 'grid-cols-2';
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className={`grid gap-3 mb-3 ${showCredito ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 mb-3 ${cols}`}>
           <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
             <div className="text-xs text-muted-foreground mb-1">Débito</div>
             <div className="text-sm font-semibold text-red-700">{fmtBRL(debito)}</div>
@@ -53,13 +54,15 @@ function SaldoCard({ title, debito, credito, saldo, showCredito = true }) {
               <div className="text-sm font-semibold text-green-700">{fmtBRL(credito)}</div>
             </div>
           )}
-          <div className={`text-center p-3 rounded-lg border ${isDevedor ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
-            <div className="text-xs text-muted-foreground mb-1">Saldo</div>
-            <div className={`text-sm font-semibold ${isDevedor ? 'text-amber-700' : 'text-green-700'}`}>
-              {fmtBRL(Math.abs(saldo))}
-              <span className="block text-xs font-normal">{isDevedor ? 'Devedor' : 'Credor'}</span>
+          {showSaldo && (
+            <div className={`text-center p-3 rounded-lg border ${isDevedor ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+              <div className="text-xs text-muted-foreground mb-1">Saldo</div>
+              <div className={`text-sm font-semibold ${isDevedor ? 'text-amber-700' : 'text-green-700'}`}>
+                {fmtBRL(Math.abs(saldo))}
+                <span className="block text-xs font-normal">{isDevedor ? 'Devedor' : 'Credor'}</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -165,7 +168,6 @@ export default function DashboardLucroPresumido() {
     return periodosOrdenados.map(a => ({
       periodo: a.periodo,
       Débito: a.pis_debito || 0,
-      Saldo: Math.abs(a.pis_saldo || 0),
     }));
   }, [periodosOrdenados]);
 
@@ -174,7 +176,6 @@ export default function DashboardLucroPresumido() {
     return periodosOrdenados.map(a => ({
       periodo: a.periodo,
       Débito: a.cofins_debito || 0,
-      Saldo: Math.abs(a.cofins_saldo || 0),
     }));
   }, [periodosOrdenados]);
 
@@ -321,6 +322,7 @@ export default function DashboardLucroPresumido() {
                 credito={apuracao.pis_credito}
                 saldo={apuracao.pis_saldo}
                 showCredito={false}
+                showSaldo={false}
               />
               <Card>
                 <CardHeader className="pb-2">
@@ -335,7 +337,6 @@ export default function DashboardLucroPresumido() {
                       <Tooltip formatter={tooltipFormatter} />
                       <Legend />
                       <Bar dataKey="Débito" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
-                      <Bar dataKey="Saldo" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -353,6 +354,7 @@ export default function DashboardLucroPresumido() {
                 credito={apuracao.cofins_credito}
                 saldo={apuracao.cofins_saldo}
                 showCredito={false}
+                showSaldo={false}
               />
               <Card>
                 <CardHeader className="pb-2">
@@ -367,7 +369,6 @@ export default function DashboardLucroPresumido() {
                       <Tooltip formatter={tooltipFormatter} />
                       <Legend />
                       <Bar dataKey="Débito" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
-                      <Bar dataKey="Saldo" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
