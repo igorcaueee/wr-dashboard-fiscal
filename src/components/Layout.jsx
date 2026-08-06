@@ -41,6 +41,7 @@ const navItems = [
     children: [
       { label: 'Dashboard', path: '/lucro-presumido/dashboard', icon: LayoutDashboard },
       { label: 'Upload de SPEDs', path: '/lucro-presumido/upload', icon: Upload },
+      { label: 'Histórico de Apurações', path: '/lucro-presumido/historico', icon: History },
     ],
   },
 ];

@@ -13,6 +13,7 @@ import UploadSimples from '@/pages/UploadSimples';
 import HistoricoApuracoes from '@/pages/HistoricoApuracoes';
 import UploadLucroPresumido from '@/pages/UploadLucroPresumido';
 import DashboardLucroPresumido from '@/pages/DashboardLucroPresumido';
+import HistoricoLucroPresumido from '@/pages/HistoricoLucroPresumido';
 // Add page imports here
 
 const AuthenticatedApp = () => {
@@ -48,6 +49,7 @@ const AuthenticatedApp = () => {
         <Route path="/simples-nacional/historico" element={<HistoricoApuracoes />} />
         <Route path="/lucro-presumido/dashboard" element={<DashboardLucroPresumido />} />
         <Route path="/lucro-presumido/upload" element={<UploadLucroPresumido />} />
+        <Route path="/lucro-presumido/historico" element={<HistoricoLucroPresumido />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
