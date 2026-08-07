@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown } from 'lucide-react';
 import { getCfopDescricao } from '@/lib/cfop';
 
 const fmtBRL = (v) =>
@@ -104,6 +105,8 @@ function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary' })
 export default function DashboardLucroPresumido() {
   const [empresaId, setEmpresaId] = useState('');
   const [periodoId, setPeriodoId] = useState('');
+  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const [exporting, setExporting] = useState(false);
 
   const { data: empresas = [] } = useQuery({
     queryKey: ['empresas'],
@@ -131,6 +134,92 @@ export default function DashboardLucroPresumido() {
   const apuracao = periodoId
     ? apuracoes.find(a => a.id === periodoId)
     : periodosOrdenados[periodosOrdenados.length - 1];
+
+  const handleExportPDF = async () => {
+    const element = document.getElementById('dashboard-content');
+    if (!element) return;
+    setExporting(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const { default: jsPDF } = await import('jspdf');
+      const nome = empresa?.nome || apuracao?.nome_empresa || '';
+      const cnpj = apuracao?.cnpj
+        ? apuracao.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+        : '';
+      const periodoLabel = apuracao?.periodo || '';
+
+      // Clona o conteúdo e remove a seção de alertas (não entra no PDF)
+      const clone = element.cloneNode(true);
+      clone.querySelectorAll('[data-no-export]').forEach((el) => el.remove());
+
+      const captureWidth = 1100;
+      const originalWidth = clone.style.width;
+      clone.style.width = captureWidth + 'px';
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      clone.style.top = '0';
+      document.body.appendChild(clone);
+      const canvas = await html2canvas(clone, {
+        scale: 1.5,
+        useCORS: true,
+        windowWidth: captureWidth,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      document.body.removeChild(clone);
+      void originalWidth;
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const marginX = 10;
+      const marginTop = 10;
+      const marginBottom = 8;
+      const headerH = nome ? 22 : 0;
+
+      function drawHeader(pdfDoc) {
+        if (!nome) return;
+        pdfDoc.setFillColor(0, 123, 138);
+        pdfDoc.rect(marginX, marginTop, pageW - marginX * 2, headerH, 'F');
+        pdfDoc.setTextColor(255, 255, 255);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setFontSize(12);
+        pdfDoc.text(nome, marginX + 4, marginTop + 7);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.setFontSize(8);
+        pdfDoc.text(`CNPJ: ${cnpj}`, marginX + 4, marginTop + 14);
+        pdfDoc.text(`Período: ${periodoLabel}`, pdfDoc.internal.pageSize.getWidth() - marginX - 4, marginTop + 14, { align: 'right' });
+        pdfDoc.setTextColor(51, 51, 51);
+      }
+
+      const imgWidth = pageW - marginX * 2;
+      const contentStartY = marginTop + headerH + (headerH ? 4 : 0);
+      const availableH = pageH - contentStartY - marginBottom;
+      const totalImgH = (canvas.height * imgWidth) / canvas.width;
+
+      let remainingH = totalImgH;
+      let pageNum = 0;
+      while (remainingH > 0) {
+        if (pageNum > 0) pdf.addPage();
+        drawHeader(pdf);
+        const sliceH = Math.min(remainingH, availableH);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = Math.round((sliceH / totalImgH) * canvas.height);
+        const ctx = sliceCanvas.getContext('2d');
+        const srcSliceY = Math.round(((totalImgH - remainingH) / totalImgH) * canvas.height);
+        ctx.drawImage(canvas, 0, srcSliceY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', marginX, contentStartY, imgWidth, sliceH);
+        remainingH -= availableH;
+        pageNum++;
+      }
+      pdf.save(`dashboard-lp-${nome || 'fiscal'}.pdf`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const indicadores = useMemo(() => {
     if (!apuracao) return null;
@@ -207,14 +296,14 @@ export default function DashboardLucroPresumido() {
   const tooltipFormatter = (value) => fmtBRL(value);
 
   return (
-    <div className="p-6 md:p-8 space-y-6">
+    <div id="dashboard-content" className="p-6 md:p-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard — Lucro Presumido</h1>
           <p className="text-muted-foreground text-sm mt-1">Análise do SPED ICMS e PIS/COFINS</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
           <Select value={empresaId} onValueChange={(v) => { setEmpresaId(v); setPeriodoId(''); }}>
             <SelectTrigger className="w-52">
               <SelectValue placeholder="Selecione a empresa..." />
@@ -234,6 +323,12 @@ export default function DashboardLucroPresumido() {
                 ))}
               </SelectContent>
             </Select>
+          )}
+          {apuracao && (
+            <Button variant="outline" className="gap-2" onClick={handleExportPDF} disabled={exporting}>
+              <FileDown className="w-4 h-4" />
+              {exporting ? 'Gerando...' : 'Exportar PDF'}
+            </Button>
           )}
         </div>
       </div>
@@ -473,8 +568,8 @@ export default function DashboardLucroPresumido() {
           )}
 
           {/* Alertas */}
-          {apuracao.alertas && apuracao.alertas.length > 0 && (
-            <Card>
+          {apuracao.alertas && apuracao.alertas.filter((_, i) => !dismissedAlerts.has(i)).length > 0 && (
+            <Card data-no-export>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -483,17 +578,27 @@ export default function DashboardLucroPresumido() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {apuracao.alertas.map((a, idx) => (
-                    <div key={idx} className={`flex gap-3 p-3 rounded-lg border ${alertaClass(a.tipo)}`}>
-                      {alertaIcone(a.tipo)}
-                      <div className="flex-1">
-                        <Badge variant="outline" className="text-xs mb-1">
-                          {a.tipo === 'erro' ? 'Erro' : a.tipo === 'aviso' ? 'Aviso' : 'Info'}
-                        </Badge>
-                        <p className="text-sm text-foreground">{a.descricao}</p>
+                  {apuracao.alertas.map((a, idx) => {
+                    if (dismissedAlerts.has(idx)) return null;
+                    return (
+                      <div key={idx} className={`flex gap-3 p-3 rounded-lg border ${alertaClass(a.tipo)}`}>
+                        {alertaIcone(a.tipo)}
+                        <div className="flex-1">
+                          <Badge variant="outline" className="text-xs mb-1">
+                            {a.tipo === 'erro' ? 'Erro' : a.tipo === 'aviso' ? 'Aviso' : 'Info'}
+                          </Badge>
+                          <p className="text-sm text-foreground">{a.descricao}</p>
+                        </div>
+                        <button
+                          onClick={() => setDismissedAlerts((prev) => new Set(prev).add(idx))}
+                          className="text-muted-foreground hover:text-foreground flex-shrink-0"
+                          aria-label="Remover alerta"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
