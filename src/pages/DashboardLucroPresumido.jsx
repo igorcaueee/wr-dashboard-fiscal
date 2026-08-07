@@ -155,12 +155,17 @@ export default function DashboardLucroPresumido() {
 
   const chartICMS = useMemo(() => {
     if (!periodosOrdenados.length) return [];
-    return periodosOrdenados.map(a => ({
-      periodo: a.periodo,
-      Débito: a.icms_debito || 0,
-      Crédito: a.icms_credito || 0,
-      Saldo: Math.abs(a.icms_saldo || 0),
-    }));
+    return periodosOrdenados.map(a => {
+      const saldo = a.icms_saldo || 0;
+      const isCredor = saldo < 0;
+      return {
+        periodo: a.periodo,
+        Débito: a.icms_debito || 0,
+        Crédito: a.icms_credito || 0,
+        'Valor a Pagar': isCredor ? 0 : Math.abs(saldo),
+        'Saldo Credor': isCredor ? Math.abs(saldo) : 0,
+      };
+    });
   }, [periodosOrdenados]);
 
   const chartPIS = useMemo(() => {
@@ -304,7 +309,8 @@ export default function DashboardLucroPresumido() {
                       <Legend />
                       <Bar dataKey="Débito" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
                       <Bar dataKey="Crédito" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
-                      <Bar dataKey="Saldo" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Valor a Pagar" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Saldo Credor" fill="#16a34a" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
