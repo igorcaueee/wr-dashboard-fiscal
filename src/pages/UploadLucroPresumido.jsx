@@ -27,6 +27,8 @@ export default function UploadLucroPresumido() {
     queryFn: () => base44.entities.Empresa.list('-created_date', 100),
   });
 
+  const empresasFiltradas = empresas.filter((e) => e.regime_tributario === 'lucro_presumido');
+
   const empresa = empresas.find(e => e.id === empresaId);
 
   const createMutation = useMutation({
@@ -222,7 +224,7 @@ Retorne até 8 alertas objetivos e práticos, classificados como "erro" (inconsi
                 <SelectValue placeholder="Selecione a empresa..." />
               </SelectTrigger>
               <SelectContent>
-                {empresas.map(e => (
+                {empresasFiltradas.map(e => (
                   <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
                 ))}
               </SelectContent>

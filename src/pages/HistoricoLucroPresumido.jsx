@@ -29,6 +29,8 @@ export default function HistoricoLucroPresumido() {
     queryFn: () => base44.entities.Empresa.list('-created_date', 100),
   });
 
+  const empresasFiltradas = empresas.filter((e) => e.regime_tributario === 'lucro_presumido');
+
   const { data: allApuracoes = [], isLoading } = useQuery({
     queryKey: ['apuracoes-lp', selectedEmpresaId],
     queryFn: () =>
@@ -82,7 +84,7 @@ export default function HistoricoLucroPresumido() {
                 <SelectValue placeholder="Selecione a empresa..." />
               </SelectTrigger>
               <SelectContent>
-                {empresas.map((e) => (
+                {empresasFiltradas.map((e) => (
                   <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
                 ))}
               </SelectContent>

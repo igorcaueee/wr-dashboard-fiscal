@@ -17,12 +17,6 @@ import { base44 } from '@/api/base44Client';
 
 const navItems = [
   {
-    label: 'Dashboard',
-    path: '/',
-    icon: LayoutDashboard,
-    exact: true,
-  },
-  {
     label: 'Empresas',
     path: '/empresas',
     icon: Building2,
@@ -31,6 +25,7 @@ const navItems = [
     label: 'Simples Nacional',
     icon: FileSpreadsheet,
     children: [
+      { label: 'Dashboard', path: '/', icon: LayoutDashboard },
       { label: 'Upload de Relatórios', path: '/simples-nacional/upload', icon: Upload },
       { label: 'Histórico de Apurações', path: '/simples-nacional/historico', icon: History },
     ],

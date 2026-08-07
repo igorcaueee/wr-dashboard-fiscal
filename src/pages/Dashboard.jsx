@@ -31,6 +31,8 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Empresa.list('-created_date', 100),
   });
 
+  const empresasFiltradas = empresas.filter((e) => !e.regime_tributario || e.regime_tributario === 'simples_nacional');
+
   const { data: allApuracoes = [], isLoading } = useQuery({
     queryKey: ['apuracoes', selectedEmpresaId],
     queryFn: () =>
@@ -42,10 +44,10 @@ export default function Dashboard() {
 
   // Auto-select first empresa
   useEffect(() => {
-    if (empresas.length > 0 && !selectedEmpresaId) {
-      setSelectedEmpresaId(empresas[0].id);
+    if (empresasFiltradas.length > 0 && !selectedEmpresaId) {
+      setSelectedEmpresaId(empresasFiltradas[0].id);
     }
-  }, [empresas, selectedEmpresaId]);
+  }, [empresasFiltradas, selectedEmpresaId]);
 
   const empresa = empresas.find((e) => e.id === selectedEmpresaId);
 
@@ -259,7 +261,7 @@ export default function Dashboard() {
                     <SelectValue placeholder="Selecione a empresa" />
                   </SelectTrigger>
                   <SelectContent>
-                    {empresas.map((e) => (
+                    {empresasFiltradas.map((e) => (
                       <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
                     ))}
                   </SelectContent>

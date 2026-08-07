@@ -113,6 +113,8 @@ export default function DashboardLucroPresumido() {
     queryFn: () => base44.entities.Empresa.list('-created_date', 100),
   });
 
+  const empresasFiltradas = empresas.filter((e) => e.regime_tributario === 'lucro_presumido');
+
   const { data: apuracoes = [] } = useQuery({
     queryKey: ['apuracoes-lp', empresaId],
     queryFn: () => empresaId
@@ -309,7 +311,7 @@ export default function DashboardLucroPresumido() {
               <SelectValue placeholder="Selecione a empresa..." />
             </SelectTrigger>
             <SelectContent>
-              {empresas.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
+              {empresasFiltradas.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
             </SelectContent>
           </Select>
           {apuracoes.length > 0 && (
