@@ -50,6 +50,21 @@
       "type": "number",
       "description": "Valor do ICMS nas entradas"
     },
+    "compras_por_cfop": {
+      "type": "array",
+      "description": "Compras agrupadas por CFOP (do relat\u00f3rio de entradas)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cfop": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
     "total_saidas_comercio": {
       "type": "number",
       "description": "Receita de revenda (Anexo I)"

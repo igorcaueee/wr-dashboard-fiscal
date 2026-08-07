@@ -409,5 +409,41 @@ export function parseEntradas(workbook) {
     result.valor_icms_entradas = Math.round(icmsValor * 100) / 100;
   }
 
+  // Extrair compras por CFOP (Valor Contábil agrupado por CFOP)
+  const colCfop = findColumnByHeader(sheet, headerRow, ['cfop']);
+  const cfopMap = {};
+  if (colCfop >= 0 && colValorContabil >= 0) {
+    for (let r = headerRow + 1; r <= (totalGeralRow >= 0 ? totalGeralRow - 1 : range.e.r); r++) {
+      const cfopVal = extractCellValue(sheet, r, colCfop);
+      const valorVal = extractCellValue(sheet, r, colValorContabil);
+      if (!cfopVal || typeof valorVal !== 'number' || valorVal <= 0) continue;
+      const cfop = String(cfopVal).replace(/\D/g, '');
+      if (cfop.length >= 4) {
+        const key = cfop.slice(-4);
+        cfopMap[key] = (cfopMap[key] || 0) + valorVal;
+      }
+    }
+    // Formato alternativo: linhas resumo "CFOP:"
+    if (Object.keys(cfopMap).length === 0) {
+      for (let r = headerRow; r <= range.e.r; r++) {
+        const label = String(extractCellValue(sheet, r, colCfop) || '');
+        if (label.toUpperCase().startsWith('CFOP:')) {
+          const cfop = label.replace(/\D/g, '');
+          if (cfop.length >= 4 && r + 1 <= range.e.r) {
+            const v = extractCellValue(sheet, r + 1, colValorContabil);
+            if (typeof v === 'number' && v > 0) {
+              const key = cfop.slice(-4);
+              cfopMap[key] = (cfopMap[key] || 0) + v;
+            }
+          }
+        }
+      }
+    }
+  }
+  result.compras_por_cfop = Object.entries(cfopMap)
+    .map(([cfop, valor]) => ({ cfop, valor: Math.round(valor * 100) / 100 }))
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 10);
+
   return result;
 }

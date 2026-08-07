@@ -132,7 +132,7 @@ export default function UploadSimples() {
       let parsed;
 
       // Processar e somar múltiplos arquivos de entradas (filiais)
-      const entradasMerge = { total_entradas: 0, base_calculo_icms_entradas: 0, valor_icms_entradas: 0 };
+      const entradasMerge = { total_entradas: 0, base_calculo_icms_entradas: 0, valor_icms_entradas: 0, compras_por_cfop: {} };
       if (entradasFiles.length > 0) {
         for (const file of entradasFiles) {
           const data = await readFileAsArray(file);
@@ -141,10 +141,19 @@ export default function UploadSimples() {
           entradasMerge.total_entradas += e.total_entradas || 0;
           entradasMerge.base_calculo_icms_entradas += e.base_calculo_icms_entradas || 0;
           entradasMerge.valor_icms_entradas += e.valor_icms_entradas || 0;
+          if (e.compras_por_cfop) {
+            for (const item of e.compras_por_cfop) {
+              entradasMerge.compras_por_cfop[item.cfop] = (entradasMerge.compras_por_cfop[item.cfop] || 0) + item.valor;
+            }
+          }
         }
         entradasMerge.total_entradas = Math.round(entradasMerge.total_entradas * 100) / 100;
         entradasMerge.base_calculo_icms_entradas = Math.round(entradasMerge.base_calculo_icms_entradas * 100) / 100;
         entradasMerge.valor_icms_entradas = Math.round(entradasMerge.valor_icms_entradas * 100) / 100;
+        entradasMerge.compras_por_cfop = Object.entries(entradasMerge.compras_por_cfop)
+          .map(([cfop, valor]) => ({ cfop, valor: Math.round(valor * 100) / 100 }))
+          .sort((a, b) => b.valor - a.valor)
+          .slice(0, 10);
       }
 
       if (isXLSX) {
@@ -165,6 +174,7 @@ export default function UploadSimples() {
           parsed.total_entradas = entradasMerge.total_entradas;
           parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
           parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
+          parsed.compras_por_cfop = entradasMerge.compras_por_cfop;
         }
 
         // O parser Excel já calculou aliquota_efetiva e faixa_enquadramento
@@ -181,6 +191,7 @@ export default function UploadSimples() {
           parsed.total_entradas = entradasMerge.total_entradas;
           parsed.base_calculo_icms_entradas = entradasMerge.base_calculo_icms_entradas;
           parsed.valor_icms_entradas = entradasMerge.valor_icms_entradas;
+          parsed.compras_por_cfop = entradasMerge.compras_por_cfop;
         }
 
         // Calcular aliquota_efetiva para PDF
@@ -232,6 +243,7 @@ export default function UploadSimples() {
         base_calculo_icms_entradas: parsed.base_calculo_icms_entradas || 0,
         valor_icms_entradas: parsed.valor_icms_entradas || 0,
         historico_12m: parsed.historico_12m || [],
+        compras_por_cfop: parsed.compras_por_cfop || [],
       };
 
       // Verificar duplicata

@@ -12,6 +12,7 @@ import {
 import { Building2, TrendingUp, FileBarChart, Download, PieChartIcon, Calendar, Castle } from 'lucide-react';
 import { formatBRL, formatPercent, formatMesAno, periodoToSort } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import ComprasPorCfop from '@/components/ComprasPorCfop';
 
 const COLORS = {
   entrada: '#0d9488',
@@ -638,6 +639,13 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           )}
+
+          {/* Compras por CFOP */}
+          {(() => {
+            const ap = apuracaoSelecionada || ultimaApuracao;
+            if (!showEntradas || !ap?.compras_por_cfop?.length) return null;
+            return <ComprasPorCfop compras={ap.compras_por_cfop} />;
+          })()}
         </div>
       )}
     </div>
