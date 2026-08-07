@@ -8,6 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { getCfopDescricao } from '@/lib/cfop';
 
 const fmtBRL = (v) =>
   (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -74,20 +75,28 @@ function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary' })
   const max = Math.max(...items.map(i => i[valueKey] || 0));
   return (
     <div className="space-y-2">
-      {items.map((item, idx) => (
-        <div key={idx} className="space-y-1">
-          <div className="flex justify-between text-sm">
-            <span className="font-medium truncate mr-2">{item[labelKey]}</span>
-            <span className="text-muted-foreground flex-shrink-0">{fmtBRL(item[valueKey])}</span>
+      {items.map((item, idx) => {
+        const descricao = getCfopDescricao(item[labelKey]);
+        return (
+          <div key={idx} className="space-y-1">
+            <div className="flex justify-between gap-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <span className="font-medium">{item[labelKey]}</span>
+                {descricao && (
+                  <span className="text-xs text-muted-foreground"> — {descricao}</span>
+                )}
+              </div>
+              <span className="text-muted-foreground flex-shrink-0">{fmtBRL(item[valueKey])}</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full ${colorClass}`}
+                style={{ width: max > 0 ? `${(item[valueKey] / max) * 100}%` : '0%' }}
+              />
+            </div>
           </div>
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
-            <div
-              className={`h-full rounded-full ${colorClass}`}
-              style={{ width: max > 0 ? `${(item[valueKey] / max) * 100}%` : '0%' }}
-            />
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
