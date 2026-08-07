@@ -22,6 +22,10 @@ const CFOP_DESC = {
   '1551': 'Compra de bem para ativo imobilizado',
   '1556': 'Compra de material para uso ou consumo',
   '1652': 'Compra de mercadoria recebida para venda em consignação',
+  '1403': 'Compra para comercialização em operação com mercadoria sujeita ao regime de substituição tributária',
+  '1405': 'Compra para uso ou consumo em operação com mercadoria sujeita ao regime de substituição tributária',
+  '1929': 'Outra entrada de mercadoria ou prestação de serviço não especificada',
+  '1949': 'Outra entrada de mercadoria ou prestação de serviço não especificada',
   '2101': 'Compra para industrialização ou produção rural',
   '2102': 'Compra para comercialização',
   '2111': 'Compra para industrialização de produção rural',
@@ -36,6 +40,9 @@ const CFOP_DESC = {
   '2251': 'Industrialização efetuada por outra empresa',
   '2551': 'Compra de bem para o ativo imobilizado',
   '2556': 'Compra de material para uso ou consumo',
+  '2401': 'Compra para industrialização ou produção rural em operação com mercadoria sujeita ao regime de substituição tributária',
+  '2403': 'Compra para comercialização em operação com mercadoria sujeita ao regime de substituição tributária',
+  '2910': 'Entrada de bonificação, doação ou brinde',
 
   // SAÍDAS (5xxx e 6xxx)
   '5101': 'Venda de produção do estabelecimento',
