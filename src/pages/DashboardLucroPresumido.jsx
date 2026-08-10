@@ -232,16 +232,18 @@ export default function DashboardLucroPresumido() {
       .filter(item => isCfopVenda(item.cfop))
       .reduce((sum, item) => sum + (item.valor || 0), 0);
     const compras = apuracao.total_compras || 0;
-    const icms = apuracao.icms_saldo || 0;
-    const pis = apuracao.pis_saldo || 0;
-    const cofins = apuracao.cofins_saldo || 0;
-    const tributos = Math.abs(icms) + Math.abs(pis) + Math.abs(cofins);
+    // Considera apenas o valor efetivamente pago (saldo devedor); saldo
+    // credor não representa imposto pago no período.
+    const icmsPago = Math.max(apuracao.icms_saldo || 0, 0);
+    const pisPago = Math.max(apuracao.pis_saldo || 0, 0);
+    const cofinsPago = Math.max(apuracao.cofins_saldo || 0, 0);
+    const tributos = icmsPago + pisPago + cofinsPago;
 
     return {
       carga_efetiva: fat > 0 ? (tributos / fat) * 100 : 0,
-      icms_fat: fat > 0 ? (Math.abs(icms) / fat) * 100 : 0,
-      pis_fat: fat > 0 ? (Math.abs(pis) / fat) * 100 : 0,
-      cofins_fat: fat > 0 ? (Math.abs(cofins) / fat) * 100 : 0,
+      icms_fat: fat > 0 ? (icmsPago / fat) * 100 : 0,
+      pis_fat: fat > 0 ? (pisPago / fat) * 100 : 0,
+      cofins_fat: fat > 0 ? (cofinsPago / fat) * 100 : 0,
       compras_fat: fat > 0 ? (compras / fat) * 100 : 0,
       ticket_medio: (apuracao.qtd_notas_vendas || 0) > 0 ? fat / apuracao.qtd_notas_vendas : 0,
       receita_por_nota: (apuracao.qtd_notas_vendas || 0) > 0 ? fat / apuracao.qtd_notas_vendas : 0,
