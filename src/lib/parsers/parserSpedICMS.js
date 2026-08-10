@@ -36,9 +36,6 @@ export function parseSpedICMS(text) {
   // Mapa de participantes 0150
   const participantes = {};
 
-  // Rastrear ind_oper do C100 pai para processar C190
-  let currentC100Oper = null;
-
   // Acumuladores por CFOP
   const cfopVendas = {};
   const cfopCompras = {};
@@ -74,16 +71,10 @@ export function parseSpedICMS(text) {
       // |C100|ind_oper|ind_emit|cod_part|mod|cod_sit|serie|num_doc|chv_nfe|dt_doc|dt_e_s|vl_doc|...
       const ind_oper = fields[2]; // 0=entrada, 1=saída
       const cod_sit = fields[6]; // 00=normal, 02=cancelada
-
-      // Rastrear para C190 — canceladas não processam C190
-      if (cod_sit === '02' || cod_sit === '01') {
-        currentC100Oper = null;
-        continue;
-      }
-      currentC100Oper = ind_oper;
+      if (cod_sit === '02' || cod_sit === '01') continue; // canceladas
 
       const vl_doc = parseBR(fields[12]);
-      if (vl_doc <= 0) continue; // não conta nota, mas C190 ainda processa
+      if (vl_doc <= 0) continue;
 
       const cod_part = fields[4];
       const participante = participantes[cod_part] || { nome: cod_part, cnpj: '' };
@@ -106,17 +97,6 @@ export function parseSpedICMS(text) {
         }
         result.top_clientes[key].valor += vl_doc;
         result.top_clientes[key].qtd_notas += 1;
-      }
-    }
-
-    if (reg === 'C190' && currentC100Oper !== null) {
-      // |C190|cst_icms|cfop|aliq_icms|vl_opr|vl_bc_icms|vl_icms|vl_bc_icms_st|vl_icms_st|vl_red_bc|vl_ipi|cod_obs
-      // VL_OPR (campo 5) = "Total Operação" — mesmo valor exibido no relatório RESUMO do SPED
-      const vl_opr = parseBR(fields[5]);
-      if (currentC100Oper === '0') {
-        result.total_compras += vl_opr;
-      } else if (currentC100Oper === '1') {
-        result.total_vendas += vl_opr;
       }
     }
 
@@ -146,16 +126,21 @@ export function parseSpedICMS(text) {
       const vl_icms = parseBR(fields[6]);
 
       // Detecta se é saída (5xxx/6xxx) ou entrada (1xxx/2xxx)
+      // E510 é o registro de apuração consolidado por CFOP — é a fonte exata do
+      // relatório RESUMO - TOTAIS do SPED, por isso os totais de compras/vendas
+      // são somados diretamente aqui (e não a partir do C100/C190).
       const cfopNum = parseInt(cfop);
       if (cfopNum >= 5000) {
         // Saída
         if (!cfopVendas[cfop]) cfopVendas[cfop] = { cfop, valor: 0, qtd_notas: 0 };
         cfopVendas[cfop].valor += vl;
+        result.total_vendas += vl;
       } else if (cfopNum >= 1000) {
         // Entrada
         if (!cfopCompras[cfop]) cfopCompras[cfop] = { cfop, valor: 0, credito_icms: 0 };
         cfopCompras[cfop].valor += vl;
         cfopCompras[cfop].credito_icms += vl_icms;
+        result.total_compras += vl;
       }
 
       // CST ICMS
