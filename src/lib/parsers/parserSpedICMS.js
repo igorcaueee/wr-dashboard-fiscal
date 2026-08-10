@@ -36,6 +36,9 @@ export function parseSpedICMS(text) {
   // Mapa de participantes 0150
   const participantes = {};
 
+  // Rastreia o ind_oper (0=entrada,1=saída) do C100 pai atual, para os C190 filhos
+  let currentOper = null;
+
   // Acumuladores por CFOP
   const cfopVendas = {};
   const cfopCompras = {};
@@ -71,7 +74,8 @@ export function parseSpedICMS(text) {
       // |C100|ind_oper|ind_emit|cod_part|mod|cod_sit|serie|num_doc|chv_nfe|dt_doc|dt_e_s|vl_doc|...
       const ind_oper = fields[2]; // 0=entrada, 1=saída
       const cod_sit = fields[6]; // 00=normal, 02=cancelada
-      if (cod_sit === '02' || cod_sit === '01') continue; // canceladas
+      if (cod_sit === '02' || cod_sit === '01') { currentOper = null; continue; } // canceladas
+      currentOper = ind_oper;
 
       const vl_doc = parseBR(fields[12]);
       if (vl_doc <= 0) continue;
@@ -118,35 +122,32 @@ export function parseSpedICMS(text) {
       }
     }
 
-    if (reg === 'E510') {
-      // |E510|cfop|cst_icms|vl_tot_itens|vl_bc_icms|vl_icms
-      const cfop = fields[2];
-      const cst = fields[3];
-      const vl = parseBR(fields[4]);
-      const vl_icms = parseBR(fields[6]);
+    if (reg === 'C190' && currentOper !== null) {
+      // |C190|cst_icms|cfop|aliq_icms|vl_opr|vl_bc_icms|vl_icms|vl_bc_icms_st|vl_icms_st|vl_red_bc|vl_ipi|cod_obs
+      // Detalhamento do documento (C100) por CST/CFOP — é a fonte exata do
+      // relatório RESUMO - TOTAIS do SPED (Total Operação, Base ICMS, Total ICMS).
+      const cst = fields[2];
+      const cfop = fields[3];
+      const vl_opr = parseBR(fields[5]);
+      const vl_icms = parseBR(fields[7]);
 
-      // Detecta se é saída (5xxx/6xxx) ou entrada (1xxx/2xxx)
-      // E510 é o registro de apuração consolidado por CFOP — é a fonte exata do
-      // relatório RESUMO - TOTAIS do SPED, por isso os totais de compras/vendas
-      // são somados diretamente aqui (e não a partir do C100/C190).
-      const cfopNum = parseInt(cfop);
-      if (cfopNum >= 5000) {
+      if (currentOper === '1') {
         // Saída
+        result.total_vendas += vl_opr;
         if (!cfopVendas[cfop]) cfopVendas[cfop] = { cfop, valor: 0, qtd_notas: 0 };
-        cfopVendas[cfop].valor += vl;
-        result.total_vendas += vl;
-      } else if (cfopNum >= 1000) {
+        cfopVendas[cfop].valor += vl_opr;
+      } else if (currentOper === '0') {
         // Entrada
+        result.total_compras += vl_opr;
         if (!cfopCompras[cfop]) cfopCompras[cfop] = { cfop, valor: 0, credito_icms: 0 };
-        cfopCompras[cfop].valor += vl;
+        cfopCompras[cfop].valor += vl_opr;
         cfopCompras[cfop].credito_icms += vl_icms;
-        result.total_compras += vl;
       }
 
       // CST ICMS
       if (cst) {
         if (!cstMap[cst]) cstMap[cst] = 0;
-        cstMap[cst] += vl;
+        cstMap[cst] += vl_opr;
       }
     }
 
