@@ -99,7 +99,6 @@ const CFOP_DESC = {
   '6352': 'Prestação de serviço de transporte a estabelecimento industrial',
   '6353': 'Prestação de serviço de transporte a estabelecimento comercial',
   '6201': 'Devolução de compra para industrialização ou produção rural',
-  '6202': 'Venda de mercadoria adquirida ou recebida de terceiros',
   '6203': 'Venda de produção do estabelecimento, destinada à não industrialização ou produção rural',
   '6204': 'Venda de mercadoria adquirida ou recebida de terceiros, destinada à não industrialização ou produção rural',
   '6205': 'Venda de produção do estabelecimento de produção rural',
