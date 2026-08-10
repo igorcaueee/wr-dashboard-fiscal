@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown } from 'lucide-react';
-import { getCfopDescricao, isCfopVenda } from '@/lib/cfop';
+import { getCfopDescricao, isCfopVenda, isCfopCompra } from '@/lib/cfop';
 
 const fmtBRL = (v) =>
   (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -231,7 +231,12 @@ export default function DashboardLucroPresumido() {
     const fat = (apuracao.vendas_por_cfop || [])
       .filter(item => isCfopVenda(item.cfop))
       .reduce((sum, item) => sum + (item.valor || 0), 0);
-    const compras = apuracao.total_compras || 0;
+    // Considera apenas CFOPs de compra efetiva de mercadoria/insumo,
+    // excluindo devoluções de venda, retornos, entradas diversas e
+    // aquisição de serviços de transporte/comunicação.
+    const compras = (apuracao.compras_por_cfop || [])
+      .filter(item => isCfopCompra(item.cfop))
+      .reduce((sum, item) => sum + (item.valor || 0), 0);
     // Considera apenas o valor efetivamente pago (saldo devedor); saldo
     // credor não representa imposto pago no período.
     const icmsPago = Math.max(apuracao.icms_saldo || 0, 0);

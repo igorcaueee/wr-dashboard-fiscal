@@ -125,3 +125,17 @@ export function isCfopVenda(cfop) {
   if (key === '5949' || key === '6949') return false;
   return true;
 }
+
+// Indica se o CFOP de entrada representa efetivamente uma compra de
+// mercadoria/insumo, excluindo devoluções de venda (12xx/22xx), retornos e
+// entradas diversas (19xx/29xx: amostra, bonificação, conserto, consignação,
+// demonstração, comodato, etc.) e aquisição de serviços de transporte ou
+// comunicação (13xx/23xx), que não representam custo de compra.
+export function isCfopCompra(cfop) {
+  if (!cfop) return true;
+  const key = String(cfop).replace(/\D/g, '').padStart(4, '0');
+  if (key.startsWith('12') || key.startsWith('22')) return false;
+  if (key.startsWith('13') || key.startsWith('23')) return false;
+  if (key.startsWith('19') || key.startsWith('29')) return false;
+  return true;
+}
