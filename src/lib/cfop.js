@@ -109,3 +109,14 @@ export function getCfopDescricao(cfop) {
   const key = String(cfop).replace(/\D/g, '').padStart(4, '0');
   return CFOP_DESC[key] || '';
 }
+
+// Indica se o CFOP de saída representa efetivamente uma venda ou prestação
+// de serviço (faturamento), excluindo devoluções de compra (52xx/62xx) e
+// outras saídas não especificadas (X949).
+export function isCfopVenda(cfop) {
+  if (!cfop) return true;
+  const key = String(cfop).replace(/\D/g, '').padStart(4, '0');
+  if (key.startsWith('52') || key.startsWith('62')) return false;
+  if (key === '5949' || key === '6949') return false;
+  return true;
+}

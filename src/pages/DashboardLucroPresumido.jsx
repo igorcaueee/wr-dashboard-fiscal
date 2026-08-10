@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown } from 'lucide-react';
-import { getCfopDescricao } from '@/lib/cfop';
+import { getCfopDescricao, isCfopVenda } from '@/lib/cfop';
 
 const fmtBRL = (v) =>
   (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -225,7 +225,12 @@ export default function DashboardLucroPresumido() {
 
   const indicadores = useMemo(() => {
     if (!apuracao) return null;
-    const fat = apuracao.total_vendas || 0;
+    // Faturamento considerado nos indicadores: soma apenas dos CFOPs que são
+    // de fato vendas/prestação de serviços, excluindo devoluções de compra e
+    // outras saídas não especificadas.
+    const fat = (apuracao.vendas_por_cfop || [])
+      .filter(item => isCfopVenda(item.cfop))
+      .reduce((sum, item) => sum + (item.valor || 0), 0);
     const compras = apuracao.total_compras || 0;
     const icms = apuracao.icms_saldo || 0;
     const pis = apuracao.pis_saldo || 0;
