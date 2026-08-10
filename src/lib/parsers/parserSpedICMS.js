@@ -36,6 +36,9 @@ export function parseSpedICMS(text) {
   // Mapa de participantes 0150
   const participantes = {};
 
+  // Rastrear ind_oper do C100 pai para processar C190
+  let currentC100Oper = null;
+
   // Acumuladores por CFOP
   const cfopVendas = {};
   const cfopCompras = {};
@@ -70,20 +73,24 @@ export function parseSpedICMS(text) {
     if (reg === 'C100') {
       // |C100|ind_oper|ind_emit|cod_part|mod|cod_sit|serie|num_doc|chv_nfe|dt_doc|dt_e_s|vl_doc|...
       const ind_oper = fields[2]; // 0=entrada, 1=saída
-      const ind_emit = fields[3]; // 0=emissão própria, 1=terceiros
       const cod_sit = fields[6]; // 00=normal, 02=cancelada
-      if (cod_sit === '02' || cod_sit === '01') continue; // canceladas
+
+      // Rastrear para C190 — canceladas não processam C190
+      if (cod_sit === '02' || cod_sit === '01') {
+        currentC100Oper = null;
+        continue;
+      }
+      currentC100Oper = ind_oper;
+
       const vl_doc = parseBR(fields[12]);
-      if (vl_doc <= 0) continue;
+      if (vl_doc <= 0) continue; // não conta nota, mas C190 ainda processa
 
       const cod_part = fields[4];
       const participante = participantes[cod_part] || { nome: cod_part, cnpj: '' };
 
       if (ind_oper === '0') {
-        // Compra / entrada
-        result.total_compras += vl_doc;
+        // Compra / entrada — contagem de notas e top fornecedores (valor por C100)
         result.qtd_notas_compras += 1;
-        // Acumula por fornecedor
         const key = cod_part;
         if (!result.top_fornecedores[key]) {
           result.top_fornecedores[key] = { nome: participante.nome, cnpj_cpf: participante.cnpj, valor: 0, credito_icms: 0, qtd_notas: 0 };
@@ -91,10 +98,8 @@ export function parseSpedICMS(text) {
         result.top_fornecedores[key].valor += vl_doc;
         result.top_fornecedores[key].qtd_notas += 1;
       } else if (ind_oper === '1') {
-        // Venda / saída
-        result.total_vendas += vl_doc;
+        // Venda / saída — contagem de notas e top clientes (valor por C100)
         result.qtd_notas_vendas += 1;
-        // Acumula por cliente
         const key = cod_part;
         if (!result.top_clientes[key]) {
           result.top_clientes[key] = { nome: participante.nome, cnpj_cpf: participante.cnpj, valor: 0, qtd_notas: 0 };
@@ -104,9 +109,15 @@ export function parseSpedICMS(text) {
       }
     }
 
-    if (reg === 'C190') {
-      // |C190|cst_icms|cfop|aliq_icms|vl_opr|vl_bc_icms|vl_icms|vl_bc_icms_st|vl_icms_st|vl_red_bc|vl_icms|cod_obs
-      // Precisa do contexto do C100 pai — usamos E510 que é mais simples e correto
+    if (reg === 'C190' && currentC100Oper !== null) {
+      // |C190|cst_icms|cfop|aliq_icms|vl_opr|vl_bc_icms|vl_icms|vl_bc_icms_st|vl_icms_st|vl_red_bc|vl_ipi|cod_obs
+      // VL_OPR (campo 5) = "Total Operação" — mesmo valor exibido no relatório RESUMO do SPED
+      const vl_opr = parseBR(fields[5]);
+      if (currentC100Oper === '0') {
+        result.total_compras += vl_opr;
+      } else if (currentC100Oper === '1') {
+        result.total_vendas += vl_opr;
+      }
     }
 
     if (reg === 'E110') {
