@@ -38,8 +38,6 @@ export function parseSpedICMS(text) {
 
   // Rastreia o ind_oper (0=entrada,1=saída) do C100 pai atual, para os C190 filhos
   let currentOper = null;
-  // Rastreia se o C800 (NFC-e) pai atual é válido (não cancelado), para os C850 filhos
-  let currentNFCeValida = false;
 
   // Acumuladores por CFOP
   const cfopVendas = {};
@@ -103,42 +101,6 @@ export function parseSpedICMS(text) {
         }
         result.top_clientes[key].valor += vl_doc;
         result.top_clientes[key].qtd_notas += 1;
-      }
-    }
-
-    if (reg === 'C800') {
-      // |C800|ind_oper|ind_emit|cod_sit|num_doc|chv_doce|dt_doc|vl_doc|vl_desc|vl_merc|...
-      // NFC-e (venda a consumidor final) — documento sempre de saída, fora do C100/C190.
-      const cod_sit = fields[4]; // 00=regular, 02=cancelado
-      if (cod_sit === '02' || cod_sit === '01') { currentNFCeValida = false; continue; }
-      currentNFCeValida = true;
-
-      const vl_doc = parseBR(fields[8]);
-      if (vl_doc <= 0) continue;
-
-      result.qtd_notas_vendas += 1;
-      const key = 'CONSUMIDOR_FINAL_NFCE';
-      if (!result.top_clientes[key]) {
-        result.top_clientes[key] = { nome: 'Consumidor Final (NFC-e)', cnpj_cpf: '', valor: 0, qtd_notas: 0 };
-      }
-      result.top_clientes[key].valor += vl_doc;
-      result.top_clientes[key].qtd_notas += 1;
-    }
-
-    if (reg === 'C850' && currentNFCeValida) {
-      // |C850|cst_icms|cfop|aliq_icms|vl_opr|vl_bc_icms|vl_icms|vl_red_bc|vl_ipi|cod_obs
-      // Detalhamento da NFC-e por CST/CFOP — análogo ao C190, mas para o C800.
-      const cst = fields[2];
-      const cfop = fields[3];
-      const vl_opr = parseBR(fields[5]);
-
-      result.total_vendas += vl_opr;
-      if (!cfopVendas[cfop]) cfopVendas[cfop] = { cfop, valor: 0, qtd_notas: 0 };
-      cfopVendas[cfop].valor += vl_opr;
-
-      if (cst) {
-        if (!cstMap[cst]) cstMap[cst] = 0;
-        cstMap[cst] += vl_opr;
       }
     }
 
