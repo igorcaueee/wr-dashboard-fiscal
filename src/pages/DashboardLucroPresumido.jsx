@@ -240,6 +240,7 @@ export default function DashboardLucroPresumido() {
     const tributos = icmsPago + pisPago + cofinsPago;
 
     return {
+      total_impostos_pagos: tributos,
       carga_efetiva: fat > 0 ? (tributos / fat) * 100 : 0,
       icms_fat: fat > 0 ? (icmsPago / fat) * 100 : 0,
       pis_fat: fat > 0 ? (pisPago / fat) * 100 : 0,
@@ -562,8 +563,9 @@ export default function DashboardLucroPresumido() {
                 <CardTitle className="text-base">Indicadores Tributários</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                   <MetricCard title="Carga Tributária Efetiva" value={fmtPct(indicadores.carga_efetiva)} />
+                  <MetricCard title="Total de Impostos Pagos" value={fmtBRL(indicadores.total_impostos_pagos)} sub="PIS + COFINS + ICMS" />
                   <MetricCard title="ICMS / Faturamento" value={fmtPct(indicadores.icms_fat)} />
                   <MetricCard title="PIS / Faturamento" value={fmtPct(indicadores.pis_fat)} />
                   <MetricCard title="COFINS / Faturamento" value={fmtPct(indicadores.cofins_fat)} />
