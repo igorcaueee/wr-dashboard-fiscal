@@ -346,7 +346,7 @@ function FileDropZone({ file, setFile, accept, label }) {
             <X className="w-4 h-4" />
           </button>
           <CheckCircle2 className="w-8 h-8 text-green-600" />
-          <span className="text-sm font-medium text-green-700">{file.name}</span>
+          <span className="text-sm font-medium text-green-700 text-center break-all px-2 max-w-full">{file.name}</span>
           <span className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB — Clique para trocar</span>
         </>
       ) : (
