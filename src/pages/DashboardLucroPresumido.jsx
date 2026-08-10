@@ -568,9 +568,6 @@ export default function DashboardLucroPresumido() {
                   <MetricCard title="PIS / Faturamento" value={fmtPct(indicadores.pis_fat)} />
                   <MetricCard title="COFINS / Faturamento" value={fmtPct(indicadores.cofins_fat)} />
                   <MetricCard title="Compras / Faturamento" value={fmtPct(indicadores.compras_fat)} />
-                  <MetricCard title="Ticket Médio (Vendas)" value={fmtBRL(indicadores.ticket_medio)} />
-                  <MetricCard title="Receita por Nota" value={fmtBRL(indicadores.receita_por_nota)} />
-                  <MetricCard title="Compra por Nota" value={fmtBRL(indicadores.compra_por_nota)} />
                 </div>
               </CardContent>
             </Card>
