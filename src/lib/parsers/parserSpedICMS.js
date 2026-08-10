@@ -36,8 +36,9 @@ export function parseSpedICMS(text) {
   // Mapa de participantes 0150
   const participantes = {};
 
-  // Rastreia o ind_oper (0=entrada,1=saída) do C100 pai atual, para os C190 filhos
+  // Rastreia o ind_oper (0=entrada,1=saída) do C100/D100 pai atual, para os C190/D190 filhos
   let currentOper = null;
+  let currentOperD = null;
 
   // Acumuladores por CFOP
   const cfopVendas = {};
@@ -148,6 +149,30 @@ export function parseSpedICMS(text) {
       if (cst) {
         if (!cstMap[cst]) cstMap[cst] = 0;
         cstMap[cst] += vl_opr;
+      }
+    }
+
+    if (reg === 'D100') {
+      // |D100|ind_oper|ind_emit|cod_part|mod|cod_sit|...
+      const cod_sit = fields[6];
+      currentOperD = (cod_sit === '02' || cod_sit === '01') ? null : fields[2];
+    }
+
+    if (reg === 'D190' && currentOperD !== null) {
+      // |D190|cst_icms|cfop|aliq_icms|vl_opr|vl_bc_icms|vl_icms|vl_icms_st|cod_obs
+      // Serviços de transporte (fretes) adquiridos/prestados — somam-se aos totais
+      // de compras/vendas do RESUMO - TOTAIS do SPED.
+      const cfop = fields[3];
+      const vl_opr = parseBR(fields[5]);
+
+      if (currentOperD === '1') {
+        result.total_vendas += vl_opr;
+        if (!cfopVendas[cfop]) cfopVendas[cfop] = { cfop, valor: 0, qtd_notas: 0 };
+        cfopVendas[cfop].valor += vl_opr;
+      } else if (currentOperD === '0') {
+        result.total_compras += vl_opr;
+        if (!cfopCompras[cfop]) cfopCompras[cfop] = { cfop, valor: 0, credito_icms: 0 };
+        cfopCompras[cfop].valor += vl_opr;
       }
     }
 
