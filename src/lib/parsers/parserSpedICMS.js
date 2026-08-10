@@ -1,5 +1,6 @@
 // Parser do SPED EFD ICMS/IPI (arquivo .txt)
 // Retorna dados estruturados a partir das linhas do arquivo
+import { isCfopVenda, isCfopCompra } from '@/lib/cfop';
 
 function parseBR(val) {
   if (!val || val === '' || val === '0') return 0;
@@ -39,6 +40,12 @@ export function parseSpedICMS(text) {
   // Rastreia o ind_oper (0=entrada,1=saída) do C100/D100 pai atual, para os C190/D190 filhos
   let currentOper = null;
   let currentOperD = null;
+  // Rastreia o participante/documento do C100 atual, para agregação por CFOP em C190
+  let currentCodPart = null;
+  let currentNumDoc = null;
+  let currentParticipante = null;
+  const notasContadasClientes = new Set();
+  const notasContadasFornecedores = new Set();
 
   // Acumuladores por CFOP
   const cfopVendas = {};
@@ -83,25 +90,16 @@ export function parseSpedICMS(text) {
 
       const cod_part = fields[4];
       const participante = participantes[cod_part] || { nome: cod_part, cnpj: '' };
+      currentCodPart = cod_part;
+      currentNumDoc = fields[8];
+      currentParticipante = participante;
 
       if (ind_oper === '0') {
-        // Compra / entrada — contagem de notas e top fornecedores (valor por C100)
+        // Compra / entrada — contagem de notas (top fornecedores é somado por CFOP no C190)
         result.qtd_notas_compras += 1;
-        const key = cod_part;
-        if (!result.top_fornecedores[key]) {
-          result.top_fornecedores[key] = { nome: participante.nome, cnpj_cpf: participante.cnpj, valor: 0, credito_icms: 0, qtd_notas: 0 };
-        }
-        result.top_fornecedores[key].valor += vl_doc;
-        result.top_fornecedores[key].qtd_notas += 1;
       } else if (ind_oper === '1') {
-        // Venda / saída — contagem de notas e top clientes (valor por C100)
+        // Venda / saída — contagem de notas (top clientes é somado por CFOP no C190)
         result.qtd_notas_vendas += 1;
-        const key = cod_part;
-        if (!result.top_clientes[key]) {
-          result.top_clientes[key] = { nome: participante.nome, cnpj_cpf: participante.cnpj, valor: 0, qtd_notas: 0 };
-        }
-        result.top_clientes[key].valor += vl_doc;
-        result.top_clientes[key].qtd_notas += 1;
       }
     }
 
@@ -137,12 +135,41 @@ export function parseSpedICMS(text) {
         result.total_vendas += vl_opr;
         if (!cfopVendas[cfop]) cfopVendas[cfop] = { cfop, valor: 0, qtd_notas: 0 };
         cfopVendas[cfop].valor += vl_opr;
+
+        // Top clientes — apenas CFOPs de venda/prestação de serviço efetiva
+        if (isCfopVenda(cfop) && currentCodPart) {
+          const key = currentCodPart;
+          if (!result.top_clientes[key]) {
+            result.top_clientes[key] = { nome: currentParticipante.nome, cnpj_cpf: currentParticipante.cnpj, valor: 0, qtd_notas: 0 };
+          }
+          result.top_clientes[key].valor += vl_opr;
+          const docKey = `${key}_${currentNumDoc}`;
+          if (!notasContadasClientes.has(docKey)) {
+            notasContadasClientes.add(docKey);
+            result.top_clientes[key].qtd_notas += 1;
+          }
+        }
       } else if (currentOper === '0') {
         // Entrada
         result.total_compras += vl_opr;
         if (!cfopCompras[cfop]) cfopCompras[cfop] = { cfop, valor: 0, credito_icms: 0 };
         cfopCompras[cfop].valor += vl_opr;
         cfopCompras[cfop].credito_icms += vl_icms;
+
+        // Top fornecedores — apenas CFOPs de compra efetiva de mercadoria/insumo
+        if (isCfopCompra(cfop) && currentCodPart) {
+          const key = currentCodPart;
+          if (!result.top_fornecedores[key]) {
+            result.top_fornecedores[key] = { nome: currentParticipante.nome, cnpj_cpf: currentParticipante.cnpj, valor: 0, credito_icms: 0, qtd_notas: 0 };
+          }
+          result.top_fornecedores[key].valor += vl_opr;
+          result.top_fornecedores[key].credito_icms += vl_icms;
+          const docKey = `${key}_${currentNumDoc}`;
+          if (!notasContadasFornecedores.has(docKey)) {
+            notasContadasFornecedores.add(docKey);
+            result.top_fornecedores[key].qtd_notas += 1;
+          }
+        }
       }
 
       // CST ICMS
