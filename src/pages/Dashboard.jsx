@@ -248,7 +248,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+    <div className="p-6 md:p-8">
       {/* Header */}
       <DashboardHeader
         title="Dashboard — Simples Nacional"
@@ -327,7 +327,7 @@ export default function Dashboard() {
       ) : (
         <div id="dashboard-content" className="space-y-6">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard
               title="RBT12"
               value={formatBRL(ultimaApuracao?.receita_bruta_acumulada_12m)}
@@ -463,7 +463,7 @@ export default function Dashboard() {
               {barData.length === 0 ? (
                 <EmptyChartMsg msg="Sem dados de faturamento para o período." />
               ) : (
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={barData} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                     <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -502,13 +502,13 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 {ultimaApuracao?.receita_bruta_acumulada_12m ? (
-                  <div className="text-center py-6">
-                    <p className="text-3xl font-bold text-primary">
+                  <div className="text-center py-4">
+                    <p className="text-2xl font-bold text-primary">
                       {formatBRL(ultimaApuracao.receita_bruta_acumulada_12m)}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">RBT12 do período {ultimaApuracao.periodo}</p>
                     {ultimaApuracao.faixa_enquadramento && (
-                      <p className="text-sm font-medium text-primary mt-3">
+                      <p className="text-sm font-medium text-primary mt-2">
                         Faixa de Enquadramento: {ultimaApuracao.faixa_enquadramento}
                       </p>
                     )}
@@ -529,7 +529,7 @@ export default function Dashboard() {
                   <EmptyChartMsg msg="Sem dados de imposto." small />
                 ) : (
                   <div className="w-full flex justify-center">
-                    <ResponsiveContainer width="90%" height={280}>
+                    <ResponsiveContainer width="90%" height={180}>
                     <ComposedChart data={impostoData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -588,14 +588,14 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col lg:flex-row items-center justify-center gap-4">
-                  <ResponsiveContainer width={280} height={280} className="flex-shrink-0">
+                  <ResponsiveContainer width={220} height={220} className="flex-shrink-0">
                     <PieChart margin={{ top: 10, right: 60, bottom: 10, left: 10 }}>
                       <Pie
                         data={partilhaData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={55}
-                        outerRadius={100}
+                        innerRadius={45}
+                        outerRadius={80}
                         paddingAngle={3}
                         dataKey="value"
                         label={false}
@@ -638,27 +638,21 @@ export default function Dashboard() {
 
 function SummaryCard({ title, value, icon: Icon, color, subtitle }) {
   const colorMap = {
-    teal: 'bg-teal-50 text-teal-700',
-    orange: 'bg-orange-50 text-orange-700',
-    purple: 'bg-purple-50 text-purple-700',
-    green: 'bg-green-50 text-green-700',
+    teal: 'bg-teal-50 border-teal-200',
+    orange: 'bg-orange-50 border-orange-200',
+    purple: 'bg-purple-50 border-purple-200',
+    green: 'bg-green-50 border-green-200',
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
-            <p className="text-xl font-bold mt-1 text-foreground">{value}</p>
-            {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
-          </div>
-          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', colorMap[color] || colorMap.teal)}>
-            <Icon className="w-5 h-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className={cn('rounded-xl border p-4', colorMap[color] || colorMap.teal)}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
+        {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
+      </div>
+      <div className="text-xl font-bold">{value}</div>
+      {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
+    </div>
   );
 }
 
