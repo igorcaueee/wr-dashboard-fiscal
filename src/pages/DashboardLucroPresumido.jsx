@@ -157,17 +157,25 @@ export default function DashboardLucroPresumido() {
         : '';
       const periodoLabel = apuracao?.periodo || '';
 
-      // Clona o conteúdo e remove a seção de alertas (não entra no PDF)
+      // Clona o conteúdo e remove os elementos marcados para não entrar no PDF
+      // (filtros, seletores e a seção de alertas)
       const clone = element.cloneNode(true);
       clone.querySelectorAll('[data-no-export]').forEach((el) => el.remove());
 
       const captureWidth = 1100;
-      const originalWidth = clone.style.width;
       clone.style.width = captureWidth + 'px';
       clone.style.position = 'absolute';
       clone.style.left = '-9999px';
       clone.style.top = '0';
       document.body.appendChild(clone);
+
+      // Pontos de corte seguros: o topo de cada bloco de nível superior do
+      // conteúdo, para nunca quebrar uma página no meio de um card/gráfico.
+      const cloneTop = clone.getBoundingClientRect().top;
+      const breakpointsPx = Array.from(clone.children)
+        .map((child) => child.getBoundingClientRect().top - cloneTop)
+        .filter((v) => v > 0);
+
       const canvas = await html2canvas(clone, {
         scale: 1.5,
         useCORS: true,
@@ -176,7 +184,6 @@ export default function DashboardLucroPresumido() {
         logging: false,
       });
       document.body.removeChild(clone);
-      void originalWidth;
 
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageW = pdf.internal.pageSize.getWidth();
@@ -206,20 +213,38 @@ export default function DashboardLucroPresumido() {
       const availableH = pageH - contentStartY - marginBottom;
       const totalImgH = (canvas.height * imgWidth) / canvas.width;
 
-      let remainingH = totalImgH;
+      // Converte os pontos de corte (em px do clone) para a mesma escala
+      // vertical usada na imagem final (mm).
+      const mmPerClonePx = totalImgH / clone.offsetHeight;
+      const breakpointsMm = breakpointsPx.map((v) => v * mmPerClonePx).sort((a, b) => a - b);
+
+      let pos = 0;
       let pageNum = 0;
-      while (remainingH > 0) {
+      while (pos < totalImgH - 0.5) {
         if (pageNum > 0) pdf.addPage();
         drawHeader(pdf);
-        const sliceH = Math.min(remainingH, availableH);
+
+        const maxEnd = pos + availableH;
+        let sliceEnd = Math.min(maxEnd, totalImgH);
+        if (sliceEnd < totalImgH) {
+          const bestBreak = breakpointsMm
+            .filter((bp) => bp > pos + 5 && bp <= maxEnd)
+            .pop();
+          if (bestBreak) sliceEnd = bestBreak;
+        }
+
+        const sliceH = sliceEnd - pos;
+        const srcSliceY = Math.round((pos / totalImgH) * canvas.height);
+        const srcSliceH = Math.round((sliceH / totalImgH) * canvas.height);
+
         const sliceCanvas = document.createElement('canvas');
         sliceCanvas.width = canvas.width;
-        sliceCanvas.height = Math.round((sliceH / totalImgH) * canvas.height);
+        sliceCanvas.height = srcSliceH;
         const ctx = sliceCanvas.getContext('2d');
-        const srcSliceY = Math.round(((totalImgH - remainingH) / totalImgH) * canvas.height);
-        ctx.drawImage(canvas, 0, srcSliceY, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, srcSliceY, canvas.width, srcSliceH, 0, 0, canvas.width, srcSliceH);
         pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', marginX, contentStartY, imgWidth, sliceH);
-        remainingH -= availableH;
+
+        pos = sliceEnd;
         pageNum++;
       }
       pdf.save(`dashboard-lp-${nome || 'fiscal'}.pdf`);
@@ -330,7 +355,7 @@ export default function DashboardLucroPresumido() {
           { label: 'Regime', value: 'Lucro Presumido' },
         ] : []}
         filters={
-          <>
+          <div data-no-export className="flex flex-wrap items-center gap-2">
             <Select value={empresaId} onValueChange={(v) => { setEmpresaId(v); setPeriodoId(''); }}>
               <SelectTrigger className="w-52">
                 <SelectValue placeholder="Selecione a empresa..." />
@@ -357,7 +382,7 @@ export default function DashboardLucroPresumido() {
                 {exporting ? 'Gerando...' : 'Exportar PDF'}
               </Button>
             )}
-          </>
+          </div>
         }
       />
 
