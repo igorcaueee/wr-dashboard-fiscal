@@ -10,7 +10,7 @@ export default function DashboardHeader({ title, subtitle, filters, companyName,
       </div>
 
       {companyName && (
-        <div className="p-4 rounded-xl bg-primary text-primary-foreground flex flex-wrap items-center gap-4 justify-between">
+        <div data-no-export className="p-4 rounded-xl bg-primary text-primary-foreground flex flex-wrap items-center gap-4 justify-between">
           <div className="font-semibold text-lg">{companyName}</div>
           <div className="flex flex-wrap gap-4 text-sm">
             {infoItems.map((item) => (
