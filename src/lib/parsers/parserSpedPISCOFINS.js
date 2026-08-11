@@ -71,15 +71,17 @@ export function parseSpedPISCOFINS(text) {
     }
 
     if (reg === 'M210') {
-      // |M210|cod_cont|vl_rec_brt|vl_bc_cont|vl_ajus_acres_rec|vl_ajus_red_rec|vl_bc_cont_aj|aliq_pis|quant_bc_cont|vl_cont_apur|vl_ajus_acres|vl_ajus_red|vl_cont_dif|vl_cont_ativ|vl_cont_per
+      // |M210|cod_cont|vl_rec_brt|vl_bc_cont|vl_ajus_acres_rec|vl_ajus_red_rec|vl_bc_cont_aj|aliq_pis|quant_bc_cont|aliq_pis_quant|vl_cont_apur|vl_ajus_acres|vl_ajus_red|vl_cont_dif|vl_cont_dif_ant|vl_cont_per
       // Pode haver múltiplas linhas M210 (uma por código de contribuição) — somar todas.
+      // Usa vl_cont_per (valor devido no período já com os ajustes de acréscimo/redução
+      // aplicados, ex: reduções de benefícios fiscais), e não vl_cont_apur (valor antes dos ajustes).
       result.pis_base_debito += parseBR(fields[4]); // vl_bc_cont
-      result.pis_debito += parseBR(fields[11]);     // vl_cont_apur
+      result.pis_debito += parseBR(fields[16]);      // vl_cont_per
     }
 
     if (reg === 'M610') {
       result.cofins_base_debito += parseBR(fields[4]);
-      result.cofins_debito += parseBR(fields[11]);
+      result.cofins_debito += parseBR(fields[16]);   // vl_cont_per
     }
 
     if (reg === '1900') {
