@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown } from 'lucide-react';
 import { getCfopDescricao, isCfopVenda, isCfopCompra } from '@/lib/cfop';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
 
 const fmtBRL = (v) =>
   (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -313,40 +314,46 @@ export default function DashboardLucroPresumido() {
   return (
     <div id="dashboard-content" className="p-6 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard — Lucro Presumido</h1>
-          <p className="text-muted-foreground text-sm mt-1">Análise do SPED ICMS e PIS/COFINS</p>
-        </div>
-        <div className="flex gap-3 items-center">
-          <Select value={empresaId} onValueChange={(v) => { setEmpresaId(v); setPeriodoId(''); }}>
-            <SelectTrigger className="w-52">
-              <SelectValue placeholder="Selecione a empresa..." />
-            </SelectTrigger>
-            <SelectContent>
-              {empresasFiltradas.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          {apuracoes.length > 0 && (
-            <Select value={periodoId} onValueChange={setPeriodoId}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Período" />
+      <DashboardHeader
+        title="Dashboard — Lucro Presumido"
+        subtitle="Análise do SPED ICMS e PIS/COFINS"
+        companyName={apuracao ? (empresa?.nome || apuracao.nome_empresa) : null}
+        infoItems={apuracao ? [
+          { label: 'Período', value: apuracao.periodo },
+          ...(apuracao.cnpj ? [{ label: 'CNPJ', value: apuracao.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') }] : []),
+          { label: 'Regime', value: 'Lucro Presumido' },
+        ] : []}
+        filters={
+          <>
+            <Select value={empresaId} onValueChange={(v) => { setEmpresaId(v); setPeriodoId(''); }}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Selecione a empresa..." />
               </SelectTrigger>
               <SelectContent>
-                {periodosOrdenados.map(a => (
-                  <SelectItem key={a.id} value={a.id}>{a.periodo}</SelectItem>
-                ))}
+                {empresasFiltradas.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
-          )}
-          {apuracao && (
-            <Button variant="outline" className="gap-2" onClick={handleExportPDF} disabled={exporting}>
-              <FileDown className="w-4 h-4" />
-              {exporting ? 'Gerando...' : 'Exportar PDF'}
-            </Button>
-          )}
-        </div>
-      </div>
+            {apuracoes.length > 0 && (
+              <Select value={periodoId} onValueChange={setPeriodoId}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periodosOrdenados.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.periodo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {apuracao && (
+              <Button variant="outline" className="gap-2" onClick={handleExportPDF} disabled={exporting}>
+                <FileDown className="w-4 h-4" />
+                {exporting ? 'Gerando...' : 'Exportar PDF'}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {!empresaId && (
         <div className="text-center py-20 text-muted-foreground">
@@ -363,18 +370,6 @@ export default function DashboardLucroPresumido() {
 
       {apuracao && (
         <>
-          {/* Info empresa */}
-          <div className="p-4 rounded-xl bg-primary text-primary-foreground flex flex-wrap items-center gap-4 justify-between">
-            <div className="font-semibold text-lg">{empresa?.nome || apuracao.nome_empresa}</div>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <span>Período: <strong>{apuracao.periodo}</strong></span>
-              {apuracao.cnpj && (
-                <span>CNPJ: <strong>{apuracao.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}</strong></span>
-              )}
-              <span>Regime: <strong>Lucro Presumido</strong></span>
-            </div>
-          </div>
-
           {/* KPIs principais */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <MetricCard title="Compras" value={fmtBRL(apuracao.total_compras)} sub={`${apuracao.qtd_notas_compras || 0} notas`} icon={ShoppingCart} />
