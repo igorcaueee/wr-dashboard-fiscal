@@ -34,6 +34,10 @@
       "type": "number",
       "description": "Quantidade de notas de vendas"
     },
+    "total_servicos_prestados": {
+      "type": "number",
+      "description": "Receita de presta\u00e7\u00e3o de servi\u00e7os (SPED PIS/COFINS, registro F550 sem CFOP)"
+    },
     "icms_base_calculo": {
       "type": "number",
       "description": "Base de c\u00e1lculo do ICMS (E110 campo 5)"

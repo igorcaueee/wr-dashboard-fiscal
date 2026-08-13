@@ -295,8 +295,14 @@ export default function DashboardLucroPresumido() {
       periodo: a.periodo,
       Compras: a.total_compras || 0,
       Faturamento: a.total_vendas || 0,
+      'Serviços Prestados': a.total_servicos_prestados || 0,
     }));
   }, [periodosOrdenados]);
+
+  const temServicosPrestados = useMemo(
+    () => periodosOrdenados.some(a => (a.total_servicos_prestados || 0) > 0),
+    [periodosOrdenados]
+  );
 
   const chartICMS = useMemo(() => {
     if (!periodosOrdenados.length) return [];
@@ -425,6 +431,9 @@ export default function DashboardLucroPresumido() {
                   <Legend />
                   <Bar dataKey="Compras" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Faturamento" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                  {temServicosPrestados && (
+                    <Bar dataKey="Serviços Prestados" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
+                  )}
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

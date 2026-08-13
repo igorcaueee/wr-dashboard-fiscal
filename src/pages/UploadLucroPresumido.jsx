@@ -135,6 +135,7 @@ Retorne até 8 alertas objetivos e práticos, classificados como "erro" (inconsi
         qtd_notas_compras: icmsData.qtd_notas_compras || 0,
         total_vendas: Math.round((icmsData.total_vendas || 0) * 100) / 100,
         qtd_notas_vendas: icmsData.qtd_notas_vendas || 0,
+        total_servicos_prestados: Math.round((pisData.total_servicos_prestados || 0) * 100) / 100,
 
         icms_base_calculo: Math.round((icmsData.icms_base_calculo || 0) * 100) / 100,
         icms_debito: Math.round((icmsData.icms_debito || 0) * 100) / 100,

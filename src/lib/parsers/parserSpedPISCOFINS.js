@@ -24,6 +24,7 @@ export function parseSpedPISCOFINS(text) {
     cofins_credito: 0,
     cofins_debito: 0,
     cofins_saldo: 0,
+    total_servicos_prestados: 0,
     cst_pis_dist: {},
     cst_cofins_dist: {},
     cfop_receita: {},
@@ -67,6 +68,16 @@ export function parseSpedPISCOFINS(text) {
       if (cst_cofins) {
         if (!result.cst_cofins_dist[cst_cofins]) result.cst_cofins_dist[cst_cofins] = 0;
         result.cst_cofins_dist[cst_cofins] += vl_rec;
+      }
+    }
+
+    if (reg === 'F550') {
+      // |F550|vl_rec_tot|cst_pis|vl_bc_pis_excl|vl_bc_pis|aliq_pis|vl_pis|cst_cofins|vl_bc_cofins_excl|vl_bc_cofins|aliq_cofins|vl_cofins|cod_mod|cfop|cod_cta|info_compl|
+      // Registros sem CFOP (campo 14) não estão vinculados a mercadoria — representam
+      // receita de prestação de serviços (sem documento fiscal de modelo padrão).
+      const cfop = fields[14];
+      if (!cfop) {
+        result.total_servicos_prestados += parseBR(fields[2]);
       }
     }
 
