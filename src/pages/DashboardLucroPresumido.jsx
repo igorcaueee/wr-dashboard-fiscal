@@ -8,9 +8,23 @@ import { Badge } from '@/components/ui/badge';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown, Calendar } from 'lucide-react';
 import { getCfopDescricao, isCfopVenda, isCfopCompra } from '@/lib/cfop';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+
+// Mescla arrays de diferentes períodos somando os valores por chave (ex: por CFOP ou por cliente)
+function mergeByKey(arrays, key, valueKeys) {
+  const map = new Map();
+  arrays.forEach(arr => (arr || []).forEach(item => {
+    const k = item[key];
+    if (!map.has(k)) map.set(k, { ...item });
+    else {
+      const entry = map.get(k);
+      valueKeys.forEach(vk => { entry[vk] = (entry[vk] || 0) + (item[vk] || 0); });
+    }
+  }));
+  return Array.from(map.values()).sort((a, b) => (b[valueKeys[0]] || 0) - (a[valueKeys[0]] || 0));
+}
 
 const fmtBRL = (v) =>
   (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -106,6 +120,7 @@ function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary' })
 export default function DashboardLucroPresumido() {
   const [empresaId, setEmpresaId] = useState('');
   const [periodoId, setPeriodoId] = useState('');
+  const [mesesVisiveis, setMesesVisiveis] = useState(6);
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
   const [exporting, setExporting] = useState(false);
 
@@ -140,9 +155,43 @@ export default function DashboardLucroPresumido() {
     });
   }, [apuracoes]);
 
+  const ultimosMeses = useMemo(() => {
+    return periodosOrdenados.slice(-mesesVisiveis);
+  }, [periodosOrdenados, mesesVisiveis]);
+
+  // Visão geral: soma/mescla os dados dos períodos visíveis
+  const agregado = useMemo(() => {
+    if (ultimosMeses.length === 0) return null;
+    const sum = (field) => ultimosMeses.reduce((s, a) => s + (a[field] || 0), 0);
+    const ultimo = ultimosMeses[ultimosMeses.length - 1];
+    return {
+      periodo: ultimosMeses.length > 1 ? `${ultimosMeses[0].periodo} a ${ultimo.periodo}` : ultimo.periodo,
+      cnpj: ultimo.cnpj,
+      nome_empresa: ultimo.nome_empresa,
+      total_compras: sum('total_compras'),
+      qtd_notas_compras: sum('qtd_notas_compras'),
+      total_vendas: sum('total_vendas'),
+      qtd_notas_vendas: sum('qtd_notas_vendas'),
+      total_servicos_prestados: sum('total_servicos_prestados'),
+      icms_debito: sum('icms_debito'),
+      icms_credito: sum('icms_credito'),
+      icms_saldo: sum('icms_saldo'),
+      pis_debito: sum('pis_debito'),
+      pis_credito: sum('pis_credito'),
+      pis_saldo: sum('pis_saldo'),
+      cofins_debito: sum('cofins_debito'),
+      cofins_credito: sum('cofins_credito'),
+      cofins_saldo: sum('cofins_saldo'),
+      vendas_por_cfop: mergeByKey(ultimosMeses.map(a => a.vendas_por_cfop), 'cfop', ['valor', 'qtd_notas']),
+      compras_por_cfop: mergeByKey(ultimosMeses.map(a => a.compras_por_cfop), 'cfop', ['valor', 'credito_icms']),
+      top_clientes: mergeByKey(ultimosMeses.map(a => a.top_clientes), 'nome', ['valor', 'qtd_notas']),
+      top_fornecedores: mergeByKey(ultimosMeses.map(a => a.top_fornecedores), 'nome', ['valor', 'qtd_notas', 'credito_icms']),
+    };
+  }, [ultimosMeses]);
+
   const apuracao = periodoId
     ? apuracoes.find(a => a.id === periodoId)
-    : periodosOrdenados[periodosOrdenados.length - 1];
+    : agregado;
 
   const handleExportPDF = async () => {
     const element = document.getElementById('dashboard-content');
@@ -291,23 +340,23 @@ export default function DashboardLucroPresumido() {
   }, [apuracao]);
 
   const chartComprasFaturamento = useMemo(() => {
-    if (!periodosOrdenados.length) return [];
-    return periodosOrdenados.map(a => ({
+    if (!ultimosMeses.length) return [];
+    return ultimosMeses.map(a => ({
       periodo: a.periodo,
       Compras: a.total_compras || 0,
       Vendas: a.total_vendas || 0,
       'Serviços Prestados': a.total_servicos_prestados || 0,
     }));
-  }, [periodosOrdenados]);
+  }, [ultimosMeses]);
 
   const temServicosPrestados = useMemo(
-    () => periodosOrdenados.some(a => (a.total_servicos_prestados || 0) > 0),
-    [periodosOrdenados]
+    () => ultimosMeses.some(a => (a.total_servicos_prestados || 0) > 0),
+    [ultimosMeses]
   );
 
   const chartICMS = useMemo(() => {
-    if (!periodosOrdenados.length) return [];
-    return periodosOrdenados.map(a => {
+    if (!ultimosMeses.length) return [];
+    return ultimosMeses.map(a => {
       const saldo = a.icms_saldo || 0;
       const isCredor = saldo < 0;
       return {
@@ -318,23 +367,23 @@ export default function DashboardLucroPresumido() {
         'Saldo Credor': isCredor ? Math.abs(saldo) : 0,
       };
     });
-  }, [periodosOrdenados]);
+  }, [ultimosMeses]);
 
   const chartPIS = useMemo(() => {
-    if (!periodosOrdenados.length) return [];
-    return periodosOrdenados.map(a => ({
+    if (!ultimosMeses.length) return [];
+    return ultimosMeses.map(a => ({
       periodo: a.periodo,
       Débito: a.pis_debito || 0,
     }));
-  }, [periodosOrdenados]);
+  }, [ultimosMeses]);
 
   const chartCOFINS = useMemo(() => {
-    if (!periodosOrdenados.length) return [];
-    return periodosOrdenados.map(a => ({
+    if (!ultimosMeses.length) return [];
+    return ultimosMeses.map(a => ({
       periodo: a.periodo,
       Débito: a.cofins_debito || 0,
     }));
-  }, [periodosOrdenados]);
+  }, [ultimosMeses]);
 
   const alertaIcone = (tipo) => {
     if (tipo === 'erro') return <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />;
@@ -372,16 +421,31 @@ export default function DashboardLucroPresumido() {
               </SelectContent>
             </Select>
             {apuracoes.length > 0 && (
-              <Select value={periodoId} onValueChange={setPeriodoId}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Período" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periodosOrdenados.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.periodo}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <>
+                <Select value={String(mesesVisiveis)} onValueChange={(v) => setMesesVisiveis(Number(v))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">3 meses</SelectItem>
+                    <SelectItem value="6">6 meses</SelectItem>
+                    <SelectItem value="12">12 meses</SelectItem>
+                    <SelectItem value="24">24 meses</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={periodoId} onValueChange={setPeriodoId}>
+                  <SelectTrigger className="w-40">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    <SelectValue placeholder="Visão geral" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={null}>Visão geral</SelectItem>
+                    {periodosOrdenados.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.periodo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
             )}
             {apuracao && (
               <Button variant="outline" className="gap-2" onClick={handleExportPDF} disabled={exporting}>
