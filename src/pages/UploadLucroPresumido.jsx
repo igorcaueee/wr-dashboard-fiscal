@@ -91,10 +91,12 @@ export default function UploadLucroPresumido() {
 CONTEXSO TRIBUTÁRIO IMPORTANTE:
 1. ICMS: O saldo apurado NÃO é simplesmente (Débito - Crédito). O cálculo correto é: (Débitos + Ajustes a Débito) - (Créditos + Ajustes a Crédito + Saldo Credor do Período Anterior). Portanto, quando há saldo credor do período anterior, o saldo final pode ser credor (negativo) mesmo com débitos maiores que créditos no período. NÃO flague como erro matemático a diferença entre Débito e Crédito sem considerar o saldo credor anterior.
 2. PIS e COFINS: No Lucro Presumido, o regime é CUMULATIVO — NÃO gera créditos sobre compras e despesas. O imposto é calculado diretamente sobre o faturamento (PIS 0,65% e COFINS 3,00%). Portanto, a existência apenas de débito (sem crédito) é o comportamento ESPERADO e correto. NÃO flague a ausência de créditos de PIS/COFINS como erro ou inconsistência.
+3. Receita de Serviços Prestados: valores extraídos do registro F550 do SPED PIS/COFINS sem CFOP vinculado. Essa receita também é faturamento da empresa (compõe a base de cálculo de PIS/COFINS) e deve ser somada à receita de vendas ao analisar carga tributária, relação compras/faturamento e demais indicadores — não trate a ausência de CFOP nela como erro.
 
 Dados:
 - Total de Compras: R$ ${(icmsData.total_compras || 0).toFixed(2)}
-- Total de Vendas/Faturamento: R$ ${(icmsData.total_vendas || 0).toFixed(2)}
+- Total de Vendas (mercadorias): R$ ${(icmsData.total_vendas || 0).toFixed(2)}
+- Total de Serviços Prestados: R$ ${(pisData.total_servicos_prestados || 0).toFixed(2)}
 - ICMS Débito: R$ ${(icmsData.icms_debito || 0).toFixed(2)}
 - ICMS Crédito: R$ ${(icmsData.icms_credito || 0).toFixed(2)}
 - ICMS Saldo (já considera saldo credor anterior): R$ ${(icmsData.icms_saldo || 0).toFixed(2)}

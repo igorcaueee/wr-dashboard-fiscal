@@ -262,7 +262,8 @@ export default function DashboardLucroPresumido() {
     // outras saídas não especificadas.
     const fat = (apuracao.vendas_por_cfop || [])
       .filter(item => isCfopVenda(item.cfop))
-      .reduce((sum, item) => sum + (item.valor || 0), 0);
+      .reduce((sum, item) => sum + (item.valor || 0), 0)
+      + (apuracao.total_servicos_prestados || 0);
     // Considera apenas CFOPs de compra efetiva de mercadoria/insumo,
     // excluindo devoluções de venda, retornos, entradas diversas e
     // aquisição de serviços de transporte/comunicação.
@@ -294,7 +295,7 @@ export default function DashboardLucroPresumido() {
     return periodosOrdenados.map(a => ({
       periodo: a.periodo,
       Compras: a.total_compras || 0,
-      Faturamento: a.total_vendas || 0,
+      Vendas: a.total_vendas || 0,
       'Serviços Prestados': a.total_servicos_prestados || 0,
     }));
   }, [periodosOrdenados]);
@@ -419,7 +420,7 @@ export default function DashboardLucroPresumido() {
           {/* Gráfico Compras x Faturamento */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Compras e Faturamento</CardTitle>
+              <CardTitle className="text-base">Compras, Vendas e Serviços Prestados</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
@@ -430,7 +431,7 @@ export default function DashboardLucroPresumido() {
                   <Tooltip formatter={tooltipFormatter} />
                   <Legend />
                   <Bar dataKey="Compras" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Faturamento" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Vendas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
                   {temServicosPrestados && (
                     <Bar dataKey="Serviços Prestados" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
                   )}
