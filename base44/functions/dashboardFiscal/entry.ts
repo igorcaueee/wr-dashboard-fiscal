@@ -27,8 +27,17 @@ export default async function(req) {
 
     const base44 = createClientFromRequest(req);
 
-    const body = await req.json();
-    const cnpjNormalizado = (body?.cnpj || '').replace(/\D/g, '');
+    const url = new URL(req.url);
+    let cnpjRaw = url.searchParams.get('cnpj') || '';
+    if (!cnpjRaw) {
+      try {
+        const body = await req.json();
+        cnpjRaw = body?.cnpj || '';
+      } catch (e) {
+        // sem corpo JSON (ex: requisição GET) - segue com cnpjRaw vazio
+      }
+    }
+    const cnpjNormalizado = cnpjRaw.replace(/\D/g, '');
     if (!cnpjNormalizado) {
       return Response.json({ error: 'CNPJ é obrigatório' }, { status: 400 });
     }
