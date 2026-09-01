@@ -125,6 +125,7 @@ export default function LucroPresumidoDashboardContent({
   isLoading = false,
   emptyActionHref,
   emptyActionLabel,
+  isPublic = false,
 }) {
   const [mesesVisiveis, setMesesVisiveis] = useState(6);
   const [selectedPeriodo, setSelectedPeriodo] = useState('');
@@ -468,7 +469,7 @@ export default function LucroPresumidoDashboardContent({
           </div>
 
           {/* Indicadores tributários */}
-          {indicadores && (
+          {!isPublic && indicadores && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Indicadores Tributários</CardTitle>
@@ -487,7 +488,7 @@ export default function LucroPresumidoDashboardContent({
           )}
 
           {/* Alertas */}
-          {apuracao.alertas && apuracao.alertas.filter((_, i) => !dismissedAlerts.has(i)).length > 0 && (
+          {!isPublic && apuracao.alertas && apuracao.alertas.filter((_, i) => !dismissedAlerts.has(i)).length > 0 && (
             <Card data-no-export>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">

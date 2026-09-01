@@ -65,6 +65,7 @@ export default function DashboardPublico() {
           <LucroPresumidoDashboardContent
             empresa={data.empresa}
             apuracoes={data.apuracoes || []}
+            isPublic
           />
         )}
       </div>
