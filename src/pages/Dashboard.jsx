@@ -23,6 +23,15 @@ const COLORS = {
   aliquota: '#f97316',
 };
 
+// Formato compacto para rótulos de valores nas barras (evita sobreposição de texto)
+function formatCompact(v) {
+  const value = v || 0;
+  if (Math.abs(value) >= 1000) {
+    return `R$ ${(value / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`;
+  }
+  return formatBRL(value);
+}
+
 export default function Dashboard() {
   const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
   const [mesesVisiveis, setMesesVisiveis] = useState(6);
@@ -481,13 +490,13 @@ export default function Dashboard() {
                     />
                     <Legend wrapperStyle={{ fontSize: '12px' }} />
                     {showEntradas && (
-                      <Bar dataKey="Entrada" fill={COLORS.entrada} radius={[6, 6, 0, 0]} label={{ position: 'top', fill: '#374151', fontSize: 10, formatter: (v) => formatBRL(v) }} />
+                      <Bar dataKey="Entrada" fill={COLORS.entrada} radius={[6, 6, 0, 0]} label={{ position: 'top', fill: '#374151', fontSize: 10, formatter: formatCompact }} />
                     )}
                     {showServicos && (
-                      <Bar dataKey="Serviço" fill={COLORS.servico} radius={[6, 6, 0, 0]} label={{ position: 'top', fill: '#374151', fontSize: 10, formatter: (v) => formatBRL(v) }} />
+                      <Bar dataKey="Serviço" fill={COLORS.servico} radius={[6, 6, 0, 0]} label={{ position: 'top', fill: '#374151', fontSize: 10, formatter: formatCompact }} />
                     )}
                     {showSaidas && (
-                      <Bar dataKey="Saída" fill={COLORS.saida} radius={[6, 6, 0, 0]} label={{ position: 'top', fill: '#374151', fontSize: 10, formatter: (v) => formatBRL(v) }} />
+                      <Bar dataKey="Saída" fill={COLORS.saida} radius={[6, 6, 0, 0]} label={{ position: 'top', fill: '#374151', fontSize: 10, formatter: formatCompact }} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -561,7 +570,7 @@ export default function Dashboard() {
                         name="Simples Nacional"
                         fill={COLORS.imposto}
                         radius={[6, 6, 0, 0]}
-                        label={{ position: 'top', fill: '#fff', fontSize: 10, fontWeight: 'bold', formatter: (v) => formatBRL(v) }}
+                        label={{ position: 'top', fill: '#134e4a', fontSize: 10, fontWeight: 'bold', formatter: formatCompact }}
                       />
                       <Line
                         yAxisId="right"
