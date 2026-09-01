@@ -152,11 +152,12 @@ export default function Dashboard() {
       : '';
 
     // Captura o conteúdo com largura fixa para consistência no PDF
-    const captureWidth = 1100;
+    // Largura menor faz o conteúdo (textos, gráficos) aparecer maior/mais legível no PDF
+    const captureWidth = 800;
     const originalWidth = element.style.width;
     element.style.width = captureWidth + 'px';
     const canvas = await html2canvas(element, {
-      scale: 1.5,
+      scale: 2,
       useCORS: true,
       windowWidth: captureWidth,
       backgroundColor: '#ffffff',
