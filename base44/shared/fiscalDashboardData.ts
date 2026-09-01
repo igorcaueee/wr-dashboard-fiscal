@@ -134,6 +134,7 @@ export async function buildDashboardPayload(base44, empresa) {
         kpis,
         faturamento_mensal,
         icms,
+        apuracoes,
       },
     };
   }
