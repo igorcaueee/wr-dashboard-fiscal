@@ -34,6 +34,20 @@
       ],
       "default": "simples_nacional",
       "description": "Regime tribut\u00e1rio"
+    },
+    "share_token": {
+      "type": "string",
+      "description": "Token \u00fanico (UUID) para acesso p\u00fablico somente-leitura ao dashboard desta empresa"
+    },
+    "share_token_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de cria\u00e7\u00e3o do token de compartilhamento"
+    },
+    "share_token_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de expira\u00e7\u00e3o do token de compartilhamento (cria\u00e7\u00e3o + 30 dias)"
     }
   },
   "required": [

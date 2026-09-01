@@ -14,10 +14,21 @@ import HistoricoApuracoes from '@/pages/HistoricoApuracoes';
 import UploadLucroPresumido from '@/pages/UploadLucroPresumido';
 import DashboardLucroPresumido from '@/pages/DashboardLucroPresumido';
 import HistoricoLucroPresumido from '@/pages/HistoricoLucroPresumido';
+import DashboardPublico from '@/pages/DashboardPublico';
 // Add page imports here
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+
+  // Rota pública de compartilhamento: acessível sem login, sem menu e sem outras empresas.
+  // Ignora completamente o fluxo de autenticação do restante do app.
+  if (window.location.pathname.startsWith('/dashboard-publico/')) {
+    return (
+      <Routes>
+        <Route path="/dashboard-publico/:token" element={<DashboardPublico />} />
+      </Routes>
+    );
+  }
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Line, ComposedChart, Legend, Cell, PieChart, Pie,
 } from 'recharts';
-import { Building2, TrendingUp, FileBarChart, Download, PieChartIcon, Calendar } from 'lucide-react';
+import { Building2, TrendingUp, FileBarChart, PieChartIcon, Calendar } from 'lucide-react';
 import { formatBRL, formatPercent, formatMesAno, periodoToSort } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import ComprasPorCfop from '@/components/ComprasPorCfop';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import ShareLinkButton from '@/components/dashboard/ShareLinkButton';
 
 const COLORS = {
   entrada: '#0d9488',
@@ -33,6 +34,7 @@ function formatCompact(v) {
 }
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
   const [mesesVisiveis, setMesesVisiveis] = useState(6);
   const [selectedPeriodo, setSelectedPeriodo] = useState('');
@@ -148,101 +150,6 @@ export default function Dashboard() {
     ].filter((d) => d.value > 0);
   }, [agregados]);
 
-  const handleExportPDF = async () => {
-    const { default: html2canvas } = await import('html2canvas');
-    const { default: jsPDF } = await import('jspdf');
-    const element = document.getElementById('dashboard-content');
-    if (!element) return;
-
-    const nome = empresa?.nome || '';
-    const cnpj = empresa?.cnpj || '';
-    const periodoLabel = ultimosMeses.length > 0
-      ? `De ${formatMesAno(ultimosMeses[0].periodo)} a ${formatMesAno(ultimosMeses[ultimosMeses.length - 1].periodo)}`
-      : '';
-
-    // Renderiza em largura maior temporariamente para que gráficos e textos
-    // saiam nítidos e legíveis após a compressão para o PDF.
-    const captureWidth = 1400;
-    const originalWidth = element.style.width;
-    element.style.width = captureWidth + 'px';
-
-    // Captura cada seção (card) separadamente, para poder distribuí-las
-    // entre páginas sem espremer o dashboard inteiro numa única imagem.
-    const sections = Array.from(element.children);
-    const canvases = [];
-    for (const section of sections) {
-      const canvas = await html2canvas(section, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: captureWidth,
-      });
-      canvases.push(canvas);
-    }
-
-    element.style.width = originalWidth;
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const marginX = 12;
-    const marginTop = 12;
-    const marginBottom = 12;
-    const headerH = nome ? 22 : 0; // altura do cabeçalho em mm
-    const gap = 4; // espaçamento vertical entre seções, em mm
-
-    // Cabeçalho com nome, CNPJ e período (em todas as páginas)
-    function drawHeader(pdfDoc) {
-      if (!nome) return;
-      pdfDoc.setFillColor(0, 123, 138); // #007B8A
-      pdfDoc.rect(marginX, marginTop, pageW - marginX * 2, headerH, 'F');
-      pdfDoc.setTextColor(255, 255, 255);
-      pdfDoc.setFont('helvetica', 'bold');
-      pdfDoc.setFontSize(12);
-      pdfDoc.text(nome, marginX + 4, marginTop + 7);
-      pdfDoc.setFont('helvetica', 'normal');
-      pdfDoc.setFontSize(8);
-      pdfDoc.text(`CNPJ: ${cnpj}`, marginX + 4, marginTop + 14);
-      pdfDoc.text(`Período: ${periodoLabel}`, pageW - marginX - 4, marginTop + 14, { align: 'right' });
-      pdfDoc.setTextColor(51, 51, 51);
-    }
-
-    const contentStartY = marginTop + headerH + (headerH ? 4 : 0);
-    const availableW = pageW - marginX * 2;
-    const maxSectionH = pageH - contentStartY - marginBottom;
-
-    let cursorY = contentStartY;
-    drawHeader(pdf);
-
-    for (const canvas of canvases) {
-      // Respeita a proporção real do canvas capturado para não distorcer a imagem
-      const ratio = canvas.height / canvas.width;
-      let imgW = availableW;
-      let imgH = imgW * ratio;
-
-      // Se a seção for mais alta que uma página inteira, reduz proporcionalmente
-      if (imgH > maxSectionH) {
-        imgH = maxSectionH;
-        imgW = imgH / ratio;
-      }
-
-      // Quebra de página se a seção não couber no espaço restante
-      if (cursorY + imgH > pageH - marginBottom) {
-        pdf.addPage();
-        drawHeader(pdf);
-        cursorY = contentStartY;
-      }
-
-      const destX = marginX + (availableW - imgW) / 2; // centraliza horizontalmente
-      const imgData = canvas.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', destX, cursorY, imgW, imgH);
-      cursorY += imgH + gap;
-    }
-
-    pdf.save(`dashboard-${nome || 'fiscal'}.pdf`);
-  };
-
   if (empresas.length === 0) {
     return (
       <div className="p-6 md:p-8 max-w-6xl mx-auto">
@@ -309,9 +216,10 @@ export default function Dashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" className="gap-2" onClick={handleExportPDF}>
-                  <Download className="w-4 h-4" /> Exportar PDF
-                </Button>
+                <ShareLinkButton
+                  empresa={empresa}
+                  onUpdated={() => queryClient.invalidateQueries({ queryKey: ['empresas'] })}
+                />
               </>
             )}
           </>
