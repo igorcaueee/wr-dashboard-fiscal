@@ -473,7 +473,7 @@ export default function Dashboard() {
               {barData.length === 0 ? (
                 <EmptyChartMsg msg="Sem dados de faturamento para o período." />
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={320}>
                   <BarChart data={barData} barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                     <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -539,7 +539,7 @@ export default function Dashboard() {
                   <EmptyChartMsg msg="Sem dados de imposto." small />
                 ) : (
                   <div className="w-full flex justify-center">
-                    <ResponsiveContainer width="90%" height={180}>
+                    <ResponsiveContainer width="100%" height={280}>
                     <ComposedChart data={impostoData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
