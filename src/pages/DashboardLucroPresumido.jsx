@@ -1,16 +1,16 @@
 import { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, FileDown, Calendar } from 'lucide-react';
+import { TrendingUp, TrendingDown, ShoppingCart, Receipt, AlertTriangle, Info, AlertCircle, X, Calendar } from 'lucide-react';
 import { getCfopDescricao, isCfopVenda, isCfopCompra } from '@/lib/cfop';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import ShareLinkButton from '@/components/dashboard/ShareLinkButton';
 
 // Mescla arrays de diferentes períodos somando os valores por chave (ex: por CFOP ou por cliente)
 function mergeByKey(arrays, key, valueKeys) {
@@ -118,11 +118,11 @@ function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary' })
 }
 
 export default function DashboardLucroPresumido() {
+  const queryClient = useQueryClient();
   const [empresaId, setEmpresaId] = useState('');
   const [periodoId, setPeriodoId] = useState('');
   const [mesesVisiveis, setMesesVisiveis] = useState(6);
   const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
-  const [exporting, setExporting] = useState(false);
 
   const { data: empresas = [] } = useQuery({
     queryKey: ['empresas'],
@@ -192,117 +192,6 @@ export default function DashboardLucroPresumido() {
   const apuracao = periodoId
     ? apuracoes.find(a => a.id === periodoId)
     : agregado;
-
-  const handleExportPDF = async () => {
-    const element = document.getElementById('dashboard-content');
-    if (!element) return;
-    setExporting(true);
-    try {
-      const { default: html2canvas } = await import('html2canvas');
-      const { default: jsPDF } = await import('jspdf');
-      const nome = empresa?.nome || apuracao?.nome_empresa || '';
-      const cnpj = apuracao?.cnpj
-        ? apuracao.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-        : '';
-      const periodoLabel = apuracao?.periodo || '';
-
-      // Clona o conteúdo e remove os elementos marcados para não entrar no PDF
-      // (filtros, seletores e a seção de alertas)
-      const clone = element.cloneNode(true);
-      clone.querySelectorAll('[data-no-export]').forEach((el) => el.remove());
-
-      const captureWidth = 1100;
-      clone.style.width = captureWidth + 'px';
-      clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
-      clone.style.top = '0';
-      document.body.appendChild(clone);
-
-      // Pontos de corte seguros: o topo de cada bloco de nível superior do
-      // conteúdo, para nunca quebrar uma página no meio de um card/gráfico.
-      const cloneTop = clone.getBoundingClientRect().top;
-      const breakpointsPx = Array.from(clone.children)
-        .map((child) => child.getBoundingClientRect().top - cloneTop)
-        .filter((v) => v > 0);
-
-      const canvas = await html2canvas(clone, {
-        scale: 1.5,
-        useCORS: true,
-        windowWidth: captureWidth,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
-      document.body.removeChild(clone);
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const marginX = 10;
-      const marginTop = 10;
-      const marginBottom = 8;
-      const headerH = nome ? 22 : 0;
-
-      function drawHeader(pdfDoc) {
-        if (!nome) return;
-        pdfDoc.setFillColor(0, 123, 138);
-        pdfDoc.rect(marginX, marginTop, pageW - marginX * 2, headerH, 'F');
-        pdfDoc.setTextColor(255, 255, 255);
-        pdfDoc.setFont('helvetica', 'bold');
-        pdfDoc.setFontSize(12);
-        pdfDoc.text(nome, marginX + 4, marginTop + 7);
-        pdfDoc.setFont('helvetica', 'normal');
-        pdfDoc.setFontSize(8);
-        pdfDoc.text(`CNPJ: ${cnpj}`, marginX + 4, marginTop + 14);
-        pdfDoc.text(`Período: ${periodoLabel}`, pdfDoc.internal.pageSize.getWidth() - marginX - 4, marginTop + 14, { align: 'right' });
-        pdfDoc.setTextColor(51, 51, 51);
-      }
-
-      const imgWidth = pageW - marginX * 2;
-      const contentStartY = marginTop + headerH + (headerH ? 4 : 0);
-      const availableH = pageH - contentStartY - marginBottom;
-      const totalImgH = (canvas.height * imgWidth) / canvas.width;
-
-      // Converte os pontos de corte (em px do clone) para a mesma escala
-      // vertical usada na imagem final (mm).
-      const mmPerClonePx = totalImgH / clone.offsetHeight;
-      const breakpointsMm = breakpointsPx.map((v) => v * mmPerClonePx).sort((a, b) => a - b);
-
-      let pos = 0;
-      let pageNum = 0;
-      while (pos < totalImgH - 0.5) {
-        if (pageNum > 0) pdf.addPage();
-        drawHeader(pdf);
-
-        const maxEnd = pos + availableH;
-        let sliceEnd = Math.min(maxEnd, totalImgH);
-        if (sliceEnd < totalImgH) {
-          const bestBreak = breakpointsMm
-            .filter((bp) => bp > pos + 5 && bp <= maxEnd)
-            .pop();
-          if (bestBreak) sliceEnd = bestBreak;
-        }
-
-        const sliceH = sliceEnd - pos;
-        const srcSliceY = Math.round((pos / totalImgH) * canvas.height);
-        const srcSliceH = Math.round((sliceH / totalImgH) * canvas.height);
-
-        const sliceCanvas = document.createElement('canvas');
-        sliceCanvas.width = canvas.width;
-        sliceCanvas.height = srcSliceH;
-        const ctx = sliceCanvas.getContext('2d');
-        ctx.drawImage(canvas, 0, srcSliceY, canvas.width, srcSliceH, 0, 0, canvas.width, srcSliceH);
-        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', marginX, contentStartY, imgWidth, sliceH);
-
-        pos = sliceEnd;
-        pageNum++;
-      }
-      pdf.save(`dashboard-lp-${nome || 'fiscal'}.pdf`);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const indicadores = useMemo(() => {
     if (!apuracao) return null;
@@ -447,11 +336,11 @@ export default function DashboardLucroPresumido() {
                 </Select>
               </>
             )}
-            {apuracao && (
-              <Button variant="outline" className="gap-2" onClick={handleExportPDF} disabled={exporting}>
-                <FileDown className="w-4 h-4" />
-                {exporting ? 'Gerando...' : 'Exportar PDF'}
-              </Button>
+            {empresa && (
+              <ShareLinkButton
+                empresa={empresa}
+                onUpdated={() => queryClient.invalidateQueries({ queryKey: ['empresas'] })}
+              />
             )}
           </div>
         }
