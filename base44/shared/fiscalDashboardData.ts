@@ -69,12 +69,14 @@ export async function buildDashboardPayload(base44, empresa) {
           nome: empresa.nome,
           cnpj: empresa.cnpj,
           inicio_atividades: empresa.inicio_atividades || '',
+          tipo_empresa: empresa.tipo_empresa || 'somente_servico',
           periodo: periodoLabel,
         },
         kpis,
         faturamento_mensal,
         rbt12,
         impostos,
+        apuracoes,
       },
     };
   }
