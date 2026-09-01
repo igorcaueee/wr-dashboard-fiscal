@@ -160,27 +160,37 @@ export default function Dashboard() {
       ? `De ${formatMesAno(ultimosMeses[0].periodo)} a ${formatMesAno(ultimosMeses[ultimosMeses.length - 1].periodo)}`
       : '';
 
-    // Captura o conteúdo com largura fixa para consistência no PDF
-    // Largura menor faz o conteúdo (textos, gráficos) aparecer maior/mais legível no PDF
-    const captureWidth = 800;
+    // Renderiza em largura maior temporariamente para que gráficos e textos
+    // saiam nítidos e legíveis após a compressão para o PDF.
+    const captureWidth = 1400;
     const originalWidth = element.style.width;
     element.style.width = captureWidth + 'px';
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      windowWidth: captureWidth,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
+
+    // Captura cada seção (card) separadamente, para poder distribuí-las
+    // entre páginas sem espremer o dashboard inteiro numa única imagem.
+    const sections = Array.from(element.children);
+    const canvases = [];
+    for (const section of sections) {
+      const canvas = await html2canvas(section, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: captureWidth,
+      });
+      canvases.push(canvas);
+    }
+
     element.style.width = originalWidth;
 
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const marginX = 10;
-    const marginTop = 10;
-    const marginBottom = 8;
+    const marginX = 12;
+    const marginTop = 12;
+    const marginBottom = 12;
     const headerH = nome ? 22 : 0; // altura do cabeçalho em mm
+    const gap = 4; // espaçamento vertical entre seções, em mm
 
     // Cabeçalho com nome, CNPJ e período (em todas as páginas)
     function drawHeader(pdfDoc) {
@@ -194,47 +204,40 @@ export default function Dashboard() {
       pdfDoc.setFont('helvetica', 'normal');
       pdfDoc.setFontSize(8);
       pdfDoc.text(`CNPJ: ${cnpj}`, marginX + 4, marginTop + 14);
-      pdfDoc.text(`Período: ${periodoLabel}`, pdfDoc.internal.pageSize.getWidth() - marginX - 4, marginTop + 14, { align: 'right' });
+      pdfDoc.text(`Período: ${periodoLabel}`, pageW - marginX - 4, marginTop + 14, { align: 'right' });
       pdfDoc.setTextColor(51, 51, 51);
     }
 
-    // Imagem do conteúdo
-    const imgData = canvas.toDataURL('image/png');
     const contentStartY = marginTop + headerH + (headerH ? 4 : 0);
-    const availableH = pageH - contentStartY - marginBottom;
-    const imgWidth = pageW - marginX * 2;
-    const totalImgH = (canvas.height * imgWidth) / canvas.width;
+    const availableW = pageW - marginX * 2;
+    const maxSectionH = pageH - contentStartY - marginBottom;
 
-    let remainingH = totalImgH;
-    let pageNum = 0;
+    let cursorY = contentStartY;
+    drawHeader(pdf);
 
-    while (remainingH > 0) {
-      if (pageNum > 0) pdf.addPage();
-      drawHeader(pdf);
+    for (const canvas of canvases) {
+      // Respeita a proporção real do canvas capturado para não distorcer a imagem
+      const ratio = canvas.height / canvas.width;
+      let imgW = availableW;
+      let imgH = imgW * ratio;
 
-      const sliceH = Math.min(remainingH, availableH);
-      // Posição Y na imagem fonte correspondente a este slice
-      const srcY = totalImgH - remainingH;
-      const srcH = totalImgH; // altura total da imagem fonte
+      // Se a seção for mais alta que uma página inteira, reduz proporcionalmente
+      if (imgH > maxSectionH) {
+        imgH = maxSectionH;
+        imgW = imgH / ratio;
+      }
 
-      // Posição no PDF
-      const destY = contentStartY;
+      // Quebra de página se a seção não couber no espaço restante
+      if (cursorY + imgH > pageH - marginBottom) {
+        pdf.addPage();
+        drawHeader(pdf);
+        cursorY = contentStartY;
+      }
 
-      // Recorta a porção visível da imagem e desenha
-      // Criamos um canvas auxiliar com o slice
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = Math.round((sliceH / totalImgH) * canvas.height);
-      const ctx = sliceCanvas.getContext('2d');
-      const srcSliceY = Math.round((srcY / totalImgH) * canvas.height);
-      const srcSliceH = sliceCanvas.height;
-      ctx.drawImage(canvas, 0, srcSliceY, canvas.width, srcSliceH, 0, 0, canvas.width, srcSliceH);
-      const sliceData = sliceCanvas.toDataURL('image/png');
-
-      pdf.addImage(sliceData, 'PNG', marginX, destY, imgWidth, sliceH);
-
-      remainingH -= availableH;
-      pageNum++;
+      const destX = marginX + (availableW - imgW) / 2; // centraliza horizontalmente
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', destX, cursorY, imgW, imgH);
+      cursorY += imgH + gap;
     }
 
     pdf.save(`dashboard-${nome || 'fiscal'}.pdf`);
