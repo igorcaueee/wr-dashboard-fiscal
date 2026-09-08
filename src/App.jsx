@@ -14,6 +14,9 @@ import HistoricoApuracoes from '@/pages/HistoricoApuracoes';
 import UploadLucroPresumido from '@/pages/UploadLucroPresumido';
 import DashboardLucroPresumido from '@/pages/DashboardLucroPresumido';
 import HistoricoLucroPresumido from '@/pages/HistoricoLucroPresumido';
+import DashboardLucroReal from '@/pages/DashboardLucroReal';
+import UploadLucroReal from '@/pages/UploadLucroReal';
+import HistoricoLucroReal from '@/pages/HistoricoLucroReal';
 import DashboardPublico from '@/pages/DashboardPublico';
 // Add page imports here
 
@@ -61,6 +64,9 @@ const AuthenticatedApp = () => {
         <Route path="/lucro-presumido/dashboard" element={<DashboardLucroPresumido />} />
         <Route path="/lucro-presumido/upload" element={<UploadLucroPresumido />} />
         <Route path="/lucro-presumido/historico" element={<HistoricoLucroPresumido />} />
+        <Route path="/lucro-real/dashboard" element={<DashboardLucroReal />} />
+        <Route path="/lucro-real/upload" element={<UploadLucroReal />} />
+        <Route path="/lucro-real/historico" element={<HistoricoLucroReal />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Building2, AlertCircle, Loader2 } from 'lucide-react';
 import SimplesNacionalDashboardContent from '@/components/dashboard/SimplesNacionalDashboardContent';
 import LucroPresumidoDashboardContent from '@/components/dashboard/LucroPresumidoDashboardContent';
+import LucroRealDashboardContent from '@/components/dashboard/LucroRealDashboardContent';
 
 export default function DashboardPublico() {
   const { token } = useParams();
@@ -60,6 +61,12 @@ export default function DashboardPublico() {
           <SimplesNacionalDashboardContent
             empresa={data.empresa}
             apuracoes={data.apuracoes || []}
+          />
+        ) : data.regime === 'lucro_real' ? (
+          <LucroRealDashboardContent
+            empresa={data.empresa}
+            apuracoes={data.apuracoes || []}
+            isPublic
           />
         ) : (
           <LucroPresumidoDashboardContent

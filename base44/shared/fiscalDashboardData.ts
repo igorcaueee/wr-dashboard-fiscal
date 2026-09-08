@@ -139,5 +139,63 @@ export async function buildDashboardPayload(base44, empresa) {
     };
   }
 
+  if (regime === 'lucro_real') {
+    const apuracoesRaw = await base44.asServiceRole.entities.ApuracaoLucroReal.filter({ empresa_id: empresa.id });
+    const apuracoes = ordenarPorPeriodo(apuracoesRaw.filter((a) => a.periodo));
+
+    if (apuracoes.length === 0) {
+      return { error: 'Nenhuma apuração encontrada para esta empresa', status: 404 };
+    }
+
+    const ultima = apuracoes[apuracoes.length - 1];
+    const primeira = apuracoes[0];
+    const periodoLabel = apuracoes.length > 1
+      ? `${periodoParaMesAbbr(primeira.periodo)} a ${periodoParaMesAbbr(ultima.periodo)}`
+      : periodoParaMesAbbr(ultima.periodo);
+
+    const totalCompras = apuracoes.reduce((s, a) => s + (a.total_compras || 0), 0);
+    const totalVendas = apuracoes.reduce((s, a) => s + (a.total_vendas || 0), 0);
+    const totalServicos = apuracoes.reduce((s, a) => s + (a.total_servicos_prestados || 0), 0);
+
+    const kpis = [
+      { label: 'COMPRAS', valor: totalCompras },
+      { label: 'FATURAMENTO', valor: totalVendas, extra: `De ${periodoParaMesAbbr(primeira.periodo)} a ${periodoParaMesAbbr(ultima.periodo)}` },
+      { label: 'SERVIÇOS PRESTADOS', valor: totalServicos },
+      { label: 'ICMS', valor: ultima.icms_saldo || 0 },
+      { label: 'PIS', valor: ultima.pis_saldo || 0 },
+      { label: 'COFINS', valor: ultima.cofins_saldo || 0 },
+    ];
+
+    const faturamento_mensal = apuracoes.map((a) => ({
+      mes: periodoParaMesAbbr(a.periodo),
+      compras: a.total_compras || 0,
+      vendas: a.total_vendas || 0,
+      servicos: a.total_servicos_prestados || 0,
+    }));
+
+    const icms = {
+      debito: ultima.icms_debito || 0,
+      credito: ultima.icms_credito || 0,
+      saldo: ultima.icms_saldo || 0,
+      evolucao: apuracoes.map((a) => ({ mes: a.periodo, valor: a.icms_saldo || 0 })),
+    };
+
+    return {
+      data: {
+        regime,
+        empresa: {
+          nome: empresa.nome,
+          cnpj: empresa.cnpj,
+          inicio_atividades: empresa.inicio_atividades || '',
+          periodo: periodoLabel,
+        },
+        kpis,
+        faturamento_mensal,
+        icms,
+        apuracoes,
+      },
+    };
+  }
+
   return { error: `Regime tributário "${regime}" não suportado`, status: 400 };
 }

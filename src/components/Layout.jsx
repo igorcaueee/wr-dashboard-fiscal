@@ -39,14 +39,21 @@ const navItems = [
       { label: 'Histórico de Apurações', path: '/lucro-presumido/historico', icon: History },
     ],
   },
+  {
+    label: 'Lucro Real',
+    icon: FileSpreadsheet,
+    children: [
+      { label: 'Dashboard', path: '/lucro-real/dashboard', icon: LayoutDashboard },
+      { label: 'Upload de SPEDs', path: '/lucro-real/upload', icon: Upload },
+      { label: 'Histórico de Apurações', path: '/lucro-real/historico', icon: History },
+    ],
+  },
 ];
 
-const disabledItems = [
-  { label: 'Lucro Real', emBreve: true },
-];
+const disabledItems = [];
 
 export default function Layout() {
-  const [expandedMenus, setExpandedMenus] = useState({ 'Simples Nacional': true, 'Lucro Presumido': true });
+  const [expandedMenus, setExpandedMenus] = useState({ 'Simples Nacional': true, 'Lucro Presumido': true, 'Lucro Real': true });
   const location = useLocation();
 
   const toggleMenu = (label) => {

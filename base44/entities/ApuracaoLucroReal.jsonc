@@ -1,0 +1,312 @@
+{
+  "name": "ApuracaoLucroReal",
+  "type": "object",
+  "properties": {
+    "empresa_id": {
+      "type": "string",
+      "description": "ID da empresa associada"
+    },
+    "periodo": {
+      "type": "string",
+      "description": "Per\u00edodo MM/YYYY"
+    },
+    "cnpj": {
+      "type": "string",
+      "description": "CNPJ da empresa (somente d\u00edgitos)"
+    },
+    "nome_empresa": {
+      "type": "string",
+      "description": "Nome da empresa extra\u00eddo do SPED"
+    },
+    "total_compras": {
+      "type": "number",
+      "description": "Valor total de compras (entradas C100 ind_oper=0)"
+    },
+    "qtd_notas_compras": {
+      "type": "number",
+      "description": "Quantidade de notas de compras"
+    },
+    "total_vendas": {
+      "type": "number",
+      "description": "Faturamento total (sa\u00eddas C100 ind_oper=1)"
+    },
+    "qtd_notas_vendas": {
+      "type": "number",
+      "description": "Quantidade de notas de vendas"
+    },
+    "total_servicos_prestados": {
+      "type": "number",
+      "description": "Receita de presta\u00e7\u00e3o de servi\u00e7os (SPED PIS/COFINS, registro F550 sem CFOP)"
+    },
+    "icms_base_calculo": {
+      "type": "number",
+      "description": "Base de c\u00e1lculo do ICMS (E110 campo 5)"
+    },
+    "icms_debito": {
+      "type": "number",
+      "description": "ICMS d\u00e9bito (E110 campo 3)"
+    },
+    "icms_credito": {
+      "type": "number",
+      "description": "ICMS cr\u00e9dito (E110 campo 4)"
+    },
+    "icms_ajustes_debito": {
+      "type": "number",
+      "description": "Ajustes a d\u00e9bito"
+    },
+    "icms_ajustes_credito": {
+      "type": "number",
+      "description": "Ajustes a cr\u00e9dito"
+    },
+    "icms_saldo": {
+      "type": "number",
+      "description": "Saldo devedor (+) ou credor (-) do ICMS"
+    },
+    "pis_receita_bruta": {
+      "type": "number",
+      "description": "Receita bruta PIS"
+    },
+    "pis_base_credito": {
+      "type": "number",
+      "description": "Base de c\u00e1lculo dos cr\u00e9ditos de PIS (M100)"
+    },
+    "pis_base_debito": {
+      "type": "number",
+      "description": "Base de c\u00e1lculo dos d\u00e9bitos de PIS (M210)"
+    },
+    "pis_credito": {
+      "type": "number",
+      "description": "Total de cr\u00e9ditos de PIS apurados no per\u00edodo (regime n\u00e3o-cumulativo, M100)"
+    },
+    "pis_debito": {
+      "type": "number",
+      "description": "Total de d\u00e9bitos de PIS sobre as receitas (M210)"
+    },
+    "pis_saldo": {
+      "type": "number",
+      "description": "Saldo PIS a recolher (d\u00e9bito - cr\u00e9dito)"
+    },
+    "pis_creditos_por_natureza": {
+      "type": "array",
+      "description": "Cr\u00e9ditos de PIS agrupados por natureza da base de c\u00e1lculo (insumos, energia, alugu\u00e9is, deprecia\u00e7\u00e3o, frete, etc.)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "natureza": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "cofins_receita_bruta": {
+      "type": "number",
+      "description": "Receita bruta COFINS"
+    },
+    "cofins_base_credito": {
+      "type": "number",
+      "description": "Base de c\u00e1lculo dos cr\u00e9ditos de COFINS (M500)"
+    },
+    "cofins_base_debito": {
+      "type": "number",
+      "description": "Base de c\u00e1lculo dos d\u00e9bitos de COFINS (M610)"
+    },
+    "cofins_credito": {
+      "type": "number",
+      "description": "Total de cr\u00e9ditos de COFINS apurados no per\u00edodo (regime n\u00e3o-cumulativo, M500)"
+    },
+    "cofins_debito": {
+      "type": "number",
+      "description": "Total de d\u00e9bitos de COFINS sobre as receitas (M610)"
+    },
+    "cofins_saldo": {
+      "type": "number",
+      "description": "Saldo COFINS a recolher (d\u00e9bito - cr\u00e9dito)"
+    },
+    "cofins_creditos_por_natureza": {
+      "type": "array",
+      "description": "Cr\u00e9ditos de COFINS agrupados por natureza da base de c\u00e1lculo",
+      "items": {
+        "type": "object",
+        "properties": {
+          "natureza": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "vendas_por_cfop": {
+      "type": "array",
+      "description": "Faturamento agrupado por CFOP",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cfop": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "qtd_notas": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "compras_por_cfop": {
+      "type": "array",
+      "description": "Compras agrupadas por CFOP",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cfop": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "credito_icms": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "top_clientes": {
+      "type": "array",
+      "description": "Top clientes por valor de vendas",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string"
+          },
+          "cnpj_cpf": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "qtd_notas": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "top_fornecedores": {
+      "type": "array",
+      "description": "Top fornecedores por valor de compras",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string"
+          },
+          "cnpj_cpf": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          },
+          "credito_icms": {
+            "type": "number"
+          },
+          "qtd_notas": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "icms_creditos_por_origem": {
+      "type": "array",
+      "description": "Origem dos cr\u00e9ditos de ICMS",
+      "items": {
+        "type": "object",
+        "properties": {
+          "origem": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "cst_icms_dist": {
+      "type": "array",
+      "description": "Distribui\u00e7\u00e3o por CST ICMS",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cst": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "ncm_ranking": {
+      "type": "array",
+      "description": "Ranking de NCMs",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ncm": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "vendas_por_uf": {
+      "type": "array",
+      "description": "Vendas agrupadas por UF destino",
+      "items": {
+        "type": "object",
+        "properties": {
+          "uf": {
+            "type": "string"
+          },
+          "valor": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "alertas": {
+      "type": "array",
+      "description": "Alertas e apontamentos fiscais gerados pela IA",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "erro",
+              "aviso",
+              "info"
+            ]
+          },
+          "descricao": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "empresa_id",
+    "periodo"
+  ]
+}
