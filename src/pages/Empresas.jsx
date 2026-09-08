@@ -43,11 +43,13 @@ const tipoColors = {
 const regimeLabels = {
   simples_nacional: 'Simples Nacional',
   lucro_presumido: 'Lucro Presumido',
+  lucro_real: 'Lucro Real',
 };
 
 const regimeColors = {
   simples_nacional: 'bg-teal-50 text-teal-700 border-teal-200',
   lucro_presumido: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  lucro_real: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
 const initialForm = {
