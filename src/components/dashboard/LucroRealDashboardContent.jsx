@@ -428,24 +428,6 @@ export default function LucroRealDashboardContent({
                 </CardContent>
               </Card>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Créditos de PIS por Natureza</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <HorizontalBar items={apuracao.pis_creditos_por_natureza || []} labelKey="natureza" valueKey="valor" colorClass="bg-chart-1" />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Créditos de COFINS por Natureza</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <HorizontalBar items={apuracao.cofins_creditos_por_natureza || []} labelKey="natureza" valueKey="valor" colorClass="bg-chart-2" />
-                </CardContent>
-              </Card>
-            </div>
           </div>
 
           {/* Faturamento por CFOP e Top Clientes */}
