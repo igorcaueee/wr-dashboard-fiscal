@@ -84,13 +84,21 @@ function SaldoCard({ title, debito, credito, saldo, showCredito = true, showSald
   );
 }
 
-function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary' }) {
+function formatCnpj(v) {
+  if (!v) return null;
+  const digits = String(v).replace(/\D/g, '');
+  if (digits.length !== 14) return v;
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary', subKey }) {
   if (!items || items.length === 0) return <p className="text-sm text-muted-foreground">Sem dados</p>;
   const max = Math.max(...items.map(i => i[valueKey] || 0));
   return (
     <div className="space-y-2">
       {items.map((item, idx) => {
         const descricao = getCfopDescricao(item[labelKey]);
+        const cnpj = subKey ? formatCnpj(item[subKey]) : null;
         return (
           <div key={idx} className="space-y-1">
             <div className="flex justify-between gap-2 text-sm">
@@ -98,6 +106,9 @@ function HorizontalBar({ items, labelKey, valueKey, colorClass = 'bg-primary' })
                 <span className="font-medium">{item[labelKey]}</span>
                 {descricao && (
                   <span className="text-xs text-muted-foreground"> — {descricao}</span>
+                )}
+                {cnpj && (
+                  <span className="text-xs text-muted-foreground"> — {cnpj}</span>
                 )}
               </div>
               <span className="text-muted-foreground flex-shrink-0">{fmtBRL(item[valueKey])}</span>
@@ -443,7 +454,7 @@ export default function LucroPresumidoDashboardContent({
                 <CardTitle className="text-base">Top Clientes</CardTitle>
               </CardHeader>
               <CardContent>
-                <HorizontalBar items={(apuracao.top_clientes || []).slice(0, 5)} labelKey="nome" valueKey="valor" colorClass="bg-chart-2" />
+                <HorizontalBar items={(apuracao.top_clientes || []).slice(0, 5)} labelKey="nome" valueKey="valor" colorClass="bg-chart-2" subKey="cnpj_cpf" />
               </CardContent>
             </Card>
           </div>
@@ -463,7 +474,7 @@ export default function LucroPresumidoDashboardContent({
                 <CardTitle className="text-base">Top Fornecedores</CardTitle>
               </CardHeader>
               <CardContent>
-                <HorizontalBar items={(apuracao.top_fornecedores || []).slice(0, 5)} labelKey="nome" valueKey="valor" colorClass="bg-chart-4" />
+                <HorizontalBar items={(apuracao.top_fornecedores || []).slice(0, 5)} labelKey="nome" valueKey="valor" colorClass="bg-chart-4" subKey="cnpj_cpf" />
               </CardContent>
             </Card>
           </div>
