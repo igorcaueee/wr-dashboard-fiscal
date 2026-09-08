@@ -64,6 +64,13 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
     cofins_creditos_por_natureza: {},
   };
 
+  let temM200 = false;
+  let temM600 = false;
+  let pisDebitoM210 = 0;
+  let pisCreditoM100 = 0;
+  let cofinsDebitoM610 = 0;
+  let cofinsCreditoM500 = 0;
+
   for (const line of lines) {
     const fields = line.split('|');
     const reg = fields[1];
@@ -93,48 +100,76 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
       }
     }
 
-    // Créditos de PIS — um registro M100 por natureza de crédito (COD_CRED)
+    // Créditos de PIS por natureza — um registro M100 por natureza de crédito (COD_CRED).
+    // Usado para o detalhamento por natureza, e como reserva do total de crédito
+    // caso o SPED não traga o registro-resumo M200.
     if (reg === 'M100') {
       const cod_cred = fields[2];
       const vl_bc_pis = parseBR(fields[6]);
       const vl_cred_pis = parseBR(fields[10]);
       result.pis_base_credito += vl_bc_pis;
-      result.pis_credito += vl_cred_pis;
+      pisCreditoM100 += vl_cred_pis;
       if (vl_cred_pis > 0) {
         const natureza = getNaturezaCredito(cod_cred);
         result.pis_creditos_por_natureza[natureza] = (result.pis_creditos_por_natureza[natureza] || 0) + vl_cred_pis;
       }
     }
 
-    // Débitos de PIS sobre as receitas
+    // Débito de PIS (detalhamento e reserva caso não haja M200)
     if (reg === 'M210') {
       result.pis_base_debito += parseBR(fields[4]);
-      result.pis_debito += parseBR(fields[16]); // vl_cont_per — valor devido no período já com ajustes
+      pisDebitoM210 += parseBR(fields[16]);
     }
 
-    // Créditos de COFINS — mesma lógica do M100
+    // Resumo da apuração de PIS do período — fonte oficial de débito/crédito/saldo
+    if (reg === 'M200') {
+      // |M200|VL_TOT_CONT_NC_PER|VL_TOT_CRED_DESC|VL_TOT_CRED_DESC_ANT|VL_TOT_CONT_NC_DEV|VL_RET_NC|VL_OUT_DED_NC|VL_CONT_NC_REC|VL_TOT_CONT_CUM_PER|VL_RET_CUM|VL_OUT_DED_CUM|VL_CONT_CUM_REC|VL_TOT_CONT_REC|
+      result.pis_debito = parseBR(fields[2]);   // Valor Total da Contribuição Não Cumulativa apurada no período
+      result.pis_credito = parseBR(fields[3]);  // Valor do Crédito Descontado no período
+      result.pis_saldo = parseBR(fields[13]);   // Valor Total da Contribuição a Recolher
+      temM200 = true;
+    }
+
+    // Créditos de COFINS por natureza — mesma lógica do M100
     if (reg === 'M500') {
       const cod_cred = fields[2];
       const vl_bc_cofins = parseBR(fields[6]);
       const vl_cred_cofins = parseBR(fields[10]);
       result.cofins_base_credito += vl_bc_cofins;
-      result.cofins_credito += vl_cred_cofins;
+      cofinsCreditoM500 += vl_cred_cofins;
       if (vl_cred_cofins > 0) {
         const natureza = getNaturezaCredito(cod_cred);
         result.cofins_creditos_por_natureza[natureza] = (result.cofins_creditos_por_natureza[natureza] || 0) + vl_cred_cofins;
       }
     }
 
-    // Débitos de COFINS sobre as receitas
+    // Débito de COFINS (detalhamento e reserva caso não haja M600)
     if (reg === 'M610') {
       result.cofins_base_debito += parseBR(fields[4]);
-      result.cofins_debito += parseBR(fields[16]);
+      cofinsDebitoM610 += parseBR(fields[16]);
+    }
+
+    // Resumo da apuração de COFINS do período — fonte oficial de débito/crédito/saldo
+    if (reg === 'M600') {
+      result.cofins_debito = parseBR(fields[2]);
+      result.cofins_credito = parseBR(fields[3]);
+      result.cofins_saldo = parseBR(fields[13]);
+      temM600 = true;
     }
   }
 
-  // Saldo a recolher = débito do período - créditos apurados (regime não-cumulativo)
-  result.pis_saldo = result.pis_debito - result.pis_credito;
-  result.cofins_saldo = result.cofins_debito - result.cofins_credito;
+  // Reserva: se o SPED não trouxer o registro-resumo M200/M600, usa os totais
+  // acumulados a partir dos registros de detalhe (M210/M100 e M610/M500).
+  if (!temM200) {
+    result.pis_debito = pisDebitoM210;
+    result.pis_credito = pisCreditoM100;
+    result.pis_saldo = pisDebitoM210 - pisCreditoM100;
+  }
+  if (!temM600) {
+    result.cofins_debito = cofinsDebitoM610;
+    result.cofins_credito = cofinsCreditoM500;
+    result.cofins_saldo = cofinsDebitoM610 - cofinsCreditoM500;
+  }
 
   result.pis_creditos_por_natureza = Object.entries(result.pis_creditos_por_natureza)
     .map(([natureza, valor]) => ({ natureza, valor }))
