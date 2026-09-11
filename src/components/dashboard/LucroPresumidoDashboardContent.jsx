@@ -487,7 +487,7 @@ export default function LucroPresumidoDashboardContent({
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                  <MetricCard title="Carga Tributária Efetiva" value={fmtPct(indicadores.carga_efetiva)} />
+                  <MetricCard title="Carga Tributária" value={fmtPct(indicadores.carga_efetiva)} />
                   <MetricCard title="Total de Impostos Pagos" value={fmtBRL(indicadores.total_impostos_pagos)} sub="PIS + COFINS + ICMS" />
                   <MetricCard title="ICMS / Faturamento" value={fmtPct(indicadores.icms_fat)} />
                   <MetricCard title="PIS / Faturamento" value={fmtPct(indicadores.pis_fat)} />
