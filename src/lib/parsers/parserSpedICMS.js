@@ -183,6 +183,14 @@ export function parseSpedICMS(text) {
       // |D100|ind_oper|ind_emit|cod_part|mod|cod_sit|...
       const cod_sit = fields[6];
       currentOperD = (cod_sit === '02' || cod_sit === '01') ? null : fields[2];
+
+      // Conhecimentos de transporte também contam como "nota" para os cards
+      // de Compras/Faturamento, já que seu valor entra em total_compras/total_vendas.
+      if (currentOperD === '0') {
+        result.qtd_notas_compras += 1;
+      } else if (currentOperD === '1') {
+        result.qtd_notas_vendas += 1;
+      }
     }
 
     if (reg === 'D190' && currentOperD !== null) {
