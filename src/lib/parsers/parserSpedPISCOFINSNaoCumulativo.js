@@ -100,6 +100,18 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
       }
     }
 
+    if (reg === 'A100') {
+      // |A100|ind_oper|ind_emit|cod_part|cod_sit|ser|sub|num_doc|chv_nfse|dt_doc|dt_exe_serv|vl_doc|...
+      // NF de Serviços (NFS-e) emitida pelo próprio contribuinte (ind_oper=1) — receita
+      // de prestação de serviços sujeita a ISS, distinta das notas de venda de mercadoria
+      // e dos CT-e (que permanecem em "vendas").
+      const ind_oper = fields[2];
+      const cod_sit = fields[5];
+      if (ind_oper === '1' && cod_sit !== '02') {
+        result.total_servicos_prestados += parseBR(fields[12]);
+      }
+    }
+
     // Créditos de PIS por natureza — um registro M100 por natureza de crédito (COD_CRED).
     // Usado para o detalhamento por natureza, e como reserva do total de crédito
     // caso o SPED não traga o registro-resumo M200.

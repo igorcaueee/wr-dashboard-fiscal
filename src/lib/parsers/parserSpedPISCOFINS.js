@@ -81,6 +81,18 @@ export function parseSpedPISCOFINS(text) {
       }
     }
 
+    if (reg === 'A100') {
+      // |A100|ind_oper|ind_emit|cod_part|cod_sit|ser|sub|num_doc|chv_nfse|dt_doc|dt_exe_serv|vl_doc|...
+      // NF de Serviços (NFS-e) emitida pelo próprio contribuinte (ind_oper=1) — receita
+      // de prestação de serviços sujeita a ISS, distinta das notas de venda de mercadoria
+      // e dos CT-e (que permanecem em "vendas").
+      const ind_oper = fields[2];
+      const cod_sit = fields[5];
+      if (ind_oper === '1' && cod_sit !== '02') {
+        result.total_servicos_prestados += parseBR(fields[12]);
+      }
+    }
+
     if (reg === 'M210') {
       // |M210|cod_cont|vl_rec_brt|vl_bc_cont|vl_ajus_acres_rec|vl_ajus_red_rec|vl_bc_cont_aj|aliq_pis|quant_bc_cont|aliq_pis_quant|vl_cont_apur|vl_ajus_acres|vl_ajus_red|vl_cont_dif|vl_cont_dif_ant|vl_cont_per
       // Pode haver múltiplas linhas M210 (uma por código de contribuição) — somar todas.
