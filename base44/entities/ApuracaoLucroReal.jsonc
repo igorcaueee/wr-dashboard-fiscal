@@ -86,6 +86,10 @@
       "type": "number",
       "description": "Saldo PIS a recolher (d\u00e9bito - cr\u00e9dito)"
     },
+    "pis_saldo_credor": {
+      "type": "number",
+      "description": "Saldo credor acumulado de PIS dispon\u00edvel para desconto/compensa\u00e7\u00e3o em per\u00edodos futuros (registro 1100)"
+    },
     "pis_creditos_por_natureza": {
       "type": "array",
       "description": "Cr\u00e9ditos de PIS agrupados por natureza da base de c\u00e1lculo (insumos, energia, alugu\u00e9is, deprecia\u00e7\u00e3o, frete, etc.)",
@@ -124,6 +128,10 @@
     "cofins_saldo": {
       "type": "number",
       "description": "Saldo COFINS a recolher (d\u00e9bito - cr\u00e9dito)"
+    },
+    "cofins_saldo_credor": {
+      "type": "number",
+      "description": "Saldo credor acumulado de COFINS dispon\u00edvel para desconto/compensa\u00e7\u00e3o em per\u00edodos futuros (registro 1500)"
     },
     "cofins_creditos_por_natureza": {
       "type": "array",

@@ -53,12 +53,14 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
     pis_base_debito: 0,
     pis_debito: 0,
     pis_saldo: 0,
+    pis_saldo_credor: 0,
     cofins_receita_bruta: 0,
     cofins_base_credito: 0,
     cofins_credito: 0,
     cofins_base_debito: 0,
     cofins_debito: 0,
     cofins_saldo: 0,
+    cofins_saldo_credor: 0,
     total_servicos_prestados: 0,
     pis_creditos_por_natureza: {},
     cofins_creditos_por_natureza: {},
@@ -116,9 +118,9 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
     // Usado para o detalhamento por natureza, e como reserva do total de crédito
     // caso o SPED não traga o registro-resumo M200.
     if (reg === 'M100') {
-      const cod_cred = fields[2];
+      const cod_cred = fields[3];
       const vl_bc_pis = parseBR(fields[6]);
-      const vl_cred_pis = parseBR(fields[10]);
+      const vl_cred_pis = parseBR(fields[12]);
       result.pis_base_credito += vl_bc_pis;
       pisCreditoM100 += vl_cred_pis;
       if (vl_cred_pis > 0) {
@@ -133,20 +135,22 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
       pisDebitoM210 += parseBR(fields[16]);
     }
 
-    // Resumo da apuração de PIS do período — fonte oficial de débito/crédito/saldo
+    // Resumo da apuração de PIS do período — fonte oficial de débito e saldo a recolher.
+    // O crédito NÃO vem daqui: o campo VL_TOT_CRED_DESC é o crédito descontado no
+    // período (líquido de compensações/saldo anterior), não o crédito apurado — o
+    // crédito do período é sempre a soma dos registros M100.
     if (reg === 'M200') {
       // |M200|VL_TOT_CONT_NC_PER|VL_TOT_CRED_DESC|VL_TOT_CRED_DESC_ANT|VL_TOT_CONT_NC_DEV|VL_RET_NC|VL_OUT_DED_NC|VL_CONT_NC_REC|VL_TOT_CONT_CUM_PER|VL_RET_CUM|VL_OUT_DED_CUM|VL_CONT_CUM_REC|VL_TOT_CONT_REC|
       result.pis_debito = parseBR(fields[2]);   // Valor Total da Contribuição Não Cumulativa apurada no período
-      result.pis_credito = parseBR(fields[3]);  // Valor do Crédito Descontado no período
       result.pis_saldo = parseBR(fields[13]);   // Valor Total da Contribuição a Recolher
       temM200 = true;
     }
 
     // Créditos de COFINS por natureza — mesma lógica do M100
     if (reg === 'M500') {
-      const cod_cred = fields[2];
+      const cod_cred = fields[3];
       const vl_bc_cofins = parseBR(fields[6]);
-      const vl_cred_cofins = parseBR(fields[10]);
+      const vl_cred_cofins = parseBR(fields[12]);
       result.cofins_base_credito += vl_bc_cofins;
       cofinsCreditoM500 += vl_cred_cofins;
       if (vl_cred_cofins > 0) {
@@ -155,31 +159,47 @@ export function parseSpedPISCOFINSNaoCumulativo(text) {
       }
     }
 
+    // Saldo credor de PIS a descontar/compensar em períodos futuros (Bloco 1 — Complemento
+    // da Escrituração). Um registro 1100 por "lote" de crédito ainda com saldo (agrupado
+    // pelo período em que foi apurado); o último campo é o saldo credor remanescente
+    // daquele lote na competência atual. O total disponível é a soma de todos os lotes.
+    if (reg === '1100') {
+      // |1100|PER_APU_CRED|ORIG_CRED|CNPJ_SUC|COD_CRED|VL_CRED_APU|VL_CRED_EXT_APU|VL_TOT_CRED_APU|VL_CRED_DESC_PA_ANT|VL_CRED_DESC_PA|VL_CRED_PER_PA|...|SLD_CRED|
+      result.pis_saldo_credor += parseBR(fields[18]);
+    }
+
+    // Saldo credor de COFINS — mesma lógica do 1100
+    if (reg === '1500') {
+      result.cofins_saldo_credor += parseBR(fields[18]);
+    }
+
     // Débito de COFINS (detalhamento e reserva caso não haja M600)
     if (reg === 'M610') {
       result.cofins_base_debito += parseBR(fields[4]);
       cofinsDebitoM610 += parseBR(fields[16]);
     }
 
-    // Resumo da apuração de COFINS do período — fonte oficial de débito/crédito/saldo
+    // Resumo da apuração de COFINS do período — fonte oficial de débito e saldo a
+    // recolher. O crédito é sempre a soma dos registros M500 (ver comentário do M200).
     if (reg === 'M600') {
       result.cofins_debito = parseBR(fields[2]);
-      result.cofins_credito = parseBR(fields[3]);
       result.cofins_saldo = parseBR(fields[13]);
       temM600 = true;
     }
   }
 
+  // O crédito do período é sempre a soma dos registros de detalhe M100/M500.
+  result.pis_credito = pisCreditoM100;
+  result.cofins_credito = cofinsCreditoM500;
+
   // Reserva: se o SPED não trouxer o registro-resumo M200/M600, usa os totais
-  // acumulados a partir dos registros de detalhe (M210/M100 e M610/M500).
+  // acumulados a partir dos registros de detalhe (M210 e M610) para débito/saldo.
   if (!temM200) {
     result.pis_debito = pisDebitoM210;
-    result.pis_credito = pisCreditoM100;
     result.pis_saldo = pisDebitoM210 - pisCreditoM100;
   }
   if (!temM600) {
     result.cofins_debito = cofinsDebitoM610;
-    result.cofins_credito = cofinsCreditoM500;
     result.cofins_saldo = cofinsDebitoM610 - cofinsCreditoM500;
   }
 

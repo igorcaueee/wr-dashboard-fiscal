@@ -48,7 +48,7 @@ function MetricCard({ title, value, sub, variant = 'default', icon: Icon }) {
   );
 }
 
-function SaldoCard({ title, debito, credito, saldo, showCredito = true, showSaldo = true }) {
+function SaldoCard({ title, debito, credito, saldo, showCredito = true, showSaldo = true, saldoCredorAcumulado }) {
   const isDevedor = saldo >= 0;
   const cols = !showCredito && !showSaldo ? 'grid-cols-1' : showCredito && showSaldo ? 'grid-cols-3' : 'grid-cols-2';
   return (
@@ -78,6 +78,12 @@ function SaldoCard({ title, debito, credito, saldo, showCredito = true, showSald
             </div>
           )}
         </div>
+        {saldoCredorAcumulado > 0 && (
+          <div className="text-center p-2 rounded-lg bg-blue-50 border border-blue-100">
+            <div className="text-xs text-muted-foreground">Saldo Credor Acumulado (a descontar/compensar)</div>
+            <div className="text-sm font-semibold text-blue-700">{fmtBRL(saldoCredorAcumulado)}</div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -174,9 +180,11 @@ export default function LucroRealDashboardContent({
       pis_debito: sum('pis_debito'),
       pis_credito: sum('pis_credito'),
       pis_saldo: sum('pis_saldo'),
+      pis_saldo_credor: ultimo.pis_saldo_credor || 0,
       cofins_debito: sum('cofins_debito'),
       cofins_credito: sum('cofins_credito'),
       cofins_saldo: sum('cofins_saldo'),
+      cofins_saldo_credor: ultimo.cofins_saldo_credor || 0,
       vendas_por_cfop: mergeByKey(ultimosMeses.map(a => a.vendas_por_cfop), 'cfop', ['valor', 'qtd_notas']),
       compras_por_cfop: mergeByKey(ultimosMeses.map(a => a.compras_por_cfop), 'cfop', ['valor', 'credito_icms']),
       top_clientes: mergeByKey(ultimosMeses.map(a => a.top_clientes), 'nome', ['valor', 'qtd_notas']),
@@ -245,12 +253,12 @@ export default function LucroRealDashboardContent({
   // Evolução PIS/COFINS já considerando os créditos apurados (regime não-cumulativo)
   const chartPIS = useMemo(() => {
     if (!ultimosMeses.length) return [];
-    return ultimosMeses.map(a => ({ periodo: a.periodo, Débito: a.pis_debito || 0, Crédito: a.pis_credito || 0, 'A Recolher': Math.max(a.pis_saldo || 0, 0) }));
+    return ultimosMeses.map(a => ({ periodo: a.periodo, Débito: a.pis_debito || 0, Crédito: a.pis_credito || 0, 'A Recolher': Math.max(a.pis_saldo || 0, 0), 'Saldo Credor': a.pis_saldo_credor || 0 }));
   }, [ultimosMeses]);
 
   const chartCOFINS = useMemo(() => {
     if (!ultimosMeses.length) return [];
-    return ultimosMeses.map(a => ({ periodo: a.periodo, Débito: a.cofins_debito || 0, Crédito: a.cofins_credito || 0, 'A Recolher': Math.max(a.cofins_saldo || 0, 0) }));
+    return ultimosMeses.map(a => ({ periodo: a.periodo, Débito: a.cofins_debito || 0, Crédito: a.cofins_credito || 0, 'A Recolher': Math.max(a.cofins_saldo || 0, 0), 'Saldo Credor': a.cofins_saldo_credor || 0 }));
   }, [ultimosMeses]);
 
   const alertaIcone = (tipo) => {
@@ -396,8 +404,8 @@ export default function LucroRealDashboardContent({
               PIS/COFINS — Apuração de Créditos e Débitos (Regime Não-Cumulativo)
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <SaldoCard title="Apuração PIS" debito={apuracao.pis_debito} credito={apuracao.pis_credito} saldo={apuracao.pis_saldo} />
-              <SaldoCard title="Apuração COFINS" debito={apuracao.cofins_debito} credito={apuracao.cofins_credito} saldo={apuracao.cofins_saldo} />
+              <SaldoCard title="Apuração PIS" debito={apuracao.pis_debito} credito={apuracao.pis_credito} saldo={apuracao.pis_saldo} saldoCredorAcumulado={apuracao.pis_saldo_credor} />
+              <SaldoCard title="Apuração COFINS" debito={apuracao.cofins_debito} credito={apuracao.cofins_credito} saldo={apuracao.cofins_saldo} saldoCredorAcumulado={apuracao.cofins_saldo_credor} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <Card>
@@ -415,6 +423,7 @@ export default function LucroRealDashboardContent({
                       <Bar dataKey="Débito" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
                       <Bar dataKey="Crédito" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
                       <Bar dataKey="A Recolher" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Saldo Credor" fill="#2563eb" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -434,6 +443,7 @@ export default function LucroRealDashboardContent({
                       <Bar dataKey="Débito" fill="hsl(var(--destructive))" radius={[3, 3, 0, 0]} />
                       <Bar dataKey="Crédito" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
                       <Bar dataKey="A Recolher" fill="hsl(var(--chart-4))" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="Saldo Credor" fill="#2563eb" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

@@ -103,6 +103,8 @@ Dados:
 - PIS Crédito (não-cumulativo): R$ ${(pisData.pis_credito || 0).toFixed(2)}
 - COFINS Débito (não-cumulativo): R$ ${(pisData.cofins_debito || 0).toFixed(2)}
 - COFINS Crédito (não-cumulativo): R$ ${(pisData.cofins_credito || 0).toFixed(2)}
+- PIS Saldo Credor Acumulado (registro 1100, a descontar/compensar em períodos futuros): R$ ${(pisData.pis_saldo_credor || 0).toFixed(2)}
+- COFINS Saldo Credor Acumulado (registro 1500, a descontar/compensar em períodos futuros): R$ ${(pisData.cofins_saldo_credor || 0).toFixed(2)}
 - CFOPs de vendas: ${(icmsData.vendas_por_cfop || []).map(c => c.cfop).join(', ')}
 - CFOPs de compras: ${(icmsData.compras_por_cfop || []).map(c => c.cfop).join(', ')}
 
@@ -153,6 +155,7 @@ Retorne até 8 alertas objetivos e práticos, classificados como "erro" (inconsi
         pis_credito: Math.round((pisData.pis_credito || 0) * 100) / 100,
         pis_debito: Math.round((pisData.pis_debito || 0) * 100) / 100,
         pis_saldo: Math.round((pisData.pis_saldo || 0) * 100) / 100,
+        pis_saldo_credor: Math.round((pisData.pis_saldo_credor || 0) * 100) / 100,
         pis_creditos_por_natureza: pisData.pis_creditos_por_natureza || [],
 
         cofins_receita_bruta: Math.round((pisData.cofins_receita_bruta || 0) * 100) / 100,
@@ -161,6 +164,7 @@ Retorne até 8 alertas objetivos e práticos, classificados como "erro" (inconsi
         cofins_credito: Math.round((pisData.cofins_credito || 0) * 100) / 100,
         cofins_debito: Math.round((pisData.cofins_debito || 0) * 100) / 100,
         cofins_saldo: Math.round((pisData.cofins_saldo || 0) * 100) / 100,
+        cofins_saldo_credor: Math.round((pisData.cofins_saldo_credor || 0) * 100) / 100,
         cofins_creditos_por_natureza: pisData.cofins_creditos_por_natureza || [],
 
         vendas_por_cfop: icmsData.vendas_por_cfop || [],
